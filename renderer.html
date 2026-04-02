@@ -587,6 +587,15 @@
           document.addEventListener('mousedown', notify);
           document.addEventListener('keydown', notify);
 
+          // Text-Selektion komplett verhindern (außer in Eingabefeldern)
+          document.addEventListener('selectstart', (e) => {
+            const tag = (e.target.tagName || '').toLowerCase();
+            if (tag !== 'input' && tag !== 'textarea' && !e.target.isContentEditable) {
+              e.preventDefault();
+            }
+          });
+          document.addEventListener('dragstart', (e) => e.preventDefault());
+
           // Swipe-Erkennung innerhalb der Webview
           let swStartX = null, swStartY = null;
           document.addEventListener('touchstart', (e) => {
