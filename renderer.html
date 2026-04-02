@@ -188,18 +188,6 @@
     webview {
       width: 100%;
       height: 100%;
-      pointer-events: auto;
-    }
-
-    #swipeOverlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 10;
-      touch-action: pan-y;
-      background: transparent;
     }
 
     #loadingScreen {
@@ -356,7 +344,6 @@
   </div>
 
   <div id="webviewContainer">
-    <div id="swipeOverlay"></div>
     <webview id="webview" src="about:blank" nodeintegration useragent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"></webview>
   </div>
 
@@ -574,11 +561,16 @@
         })();
       `);
 
-      // Scrollbar ausblenden
+      // Scrollbar ausblenden + touch-action für Swipe-Erkennung
       webview.insertCSS(`
         ::-webkit-scrollbar { display: none !important; }
-        html, body { scrollbar-width: none !important; }
-        * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; touch-action: pan-y !important; }
+        html, body {
+          scrollbar-width: none !important;
+          touch-action: pan-y !important;
+          -webkit-user-select: none !important;
+          user-select: none !important;
+          -webkit-touch-callout: none !important;
+        }
         input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
       `);
 
@@ -600,7 +592,7 @@
           document.addEventListener('mousedown', notify);
           document.addEventListener('keydown', notify);
 
-          // Text-Selektion komplett verhindern (außer in Eingabefeldern)
+          // Text-Selektion verhindern (außer in Eingabefeldern)
           document.addEventListener('selectstart', (e) => {
             const tag = (e.target.tagName || '').toLowerCase();
             if (tag !== 'input' && tag !== 'textarea' && !e.target.isContentEditable) {
@@ -610,19 +602,29 @@
           document.addEventListener('dragstart', (e) => e.preventDefault());
 
           // Swipe-Erkennung innerhalb der Webview
-          let swStartX = null, swStartY = null, swSwiped = false;
+          // touch-action: pan-y auf html/body sagt dem Browser:
+          // "Vertikales Scrollen machst du, horizontale Gesten ueberlasse mir"
+          let swStartX = null, swStartY = null, swSwiped = false, swDirection = null;
           document.addEventListener('touchstart', (e) => {
             const t = e.touches[0];
             swStartX = t.clientX;
             swStartY = t.clientY;
             swSwiped = false;
+            swDirection = null;
           }, { passive: true });
           document.addEventListener('touchmove', (e) => {
             if (swStartX === null || swSwiped) return;
             const t = e.touches[0];
             const dx = t.clientX - swStartX;
-            const dy = Math.abs(t.clientY - swStartY);
-            if (Math.abs(dx) > 60 && Math.abs(dx) > dy * 1.5) {
+            const dy = t.clientY - swStartY;
+
+            // Erst nach etwas Bewegung die Richtung bestimmen
+            if (swDirection === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+              swDirection = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+            }
+
+            // Nur bei horizontaler Geste: Swipe erkennen
+            if (swDirection === 'horizontal' && Math.abs(dx) > 60) {
               swSwiped = true;
               e.preventDefault();
               try { ipc.sendToHost('swipe', dx < 0 ? 'left' : 'right'); } catch(e) {}
@@ -632,6 +634,7 @@
             swStartX = null;
             swStartY = null;
             swSwiped = false;
+            swDirection = null;
           }, { passive: true });
         })();
       `);
@@ -677,61 +680,7 @@
       startScrollPolling();
     });
 
-    // Swipe-Erkennung über transparentes Overlay
-    const swipeOverlay = document.getElementById('swipeOverlay');
-    let swipeStartX = null;
-    let swipeStartY = null;
-    let swipeSwiped = false;
-    let swipeTimeout = null;
-
-    swipeOverlay.addEventListener('touchstart', (e) => {
-      const t = e.touches[0];
-      swipeStartX = t.clientX;
-      swipeStartY = t.clientY;
-      swipeSwiped = false;
-      // Nach kurzem Timeout ohne Swipe: Overlay transparent für Touch machen
-      // damit die Webview darunter scrollbar/klickbar wird
-      swipeTimeout = setTimeout(() => {
-        if (!swipeSwiped) {
-          swipeOverlay.style.pointerEvents = 'none';
-        }
-      }, 300);
-    }, { passive: true });
-
-    swipeOverlay.addEventListener('touchmove', (e) => {
-      if (swipeStartX === null || swipeSwiped) return;
-      const t = e.touches[0];
-      const dx = t.clientX - swipeStartX;
-      const dy = Math.abs(t.clientY - swipeStartY);
-
-      // Horizontaler Swipe erkannt
-      if (Math.abs(dx) > 60 && Math.abs(dx) > dy * 1.5) {
-        swipeSwiped = true;
-        clearTimeout(swipeTimeout);
-        e.preventDefault();
-        onInteraction();
-        if (dx < 0) {
-          currentIndex = (currentIndex + 1) % config.sites.length;
-        } else {
-          currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
-        }
-        loadSite(currentIndex);
-      }
-    }, { passive: false });
-
-    swipeOverlay.addEventListener('touchend', () => {
-      clearTimeout(swipeTimeout);
-      swipeStartX = null;
-      swipeStartY = null;
-      swipeSwiped = false;
-      // Overlay wieder aktivieren
-      swipeOverlay.style.pointerEvents = 'auto';
-    }, { passive: true });
-
-    // Klicks durch Overlay an Webview weiterleiten
-    swipeOverlay.addEventListener('click', () => {
-      onInteraction();
-    });
+    // (Swipe-Erkennung läuft jetzt innerhalb der Webview per injiziertem JS)
 
     // Timer-Loop (jede 0.5 Sekunden)
     function startTimerLoop() {
