@@ -188,6 +188,18 @@
     webview {
       width: 100%;
       height: 100%;
+      pointer-events: auto;
+    }
+
+    #swipeOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      touch-action: pan-y;
+      background: transparent;
     }
 
     #loadingScreen {
@@ -344,6 +356,7 @@
   </div>
 
   <div id="webviewContainer">
+    <div id="swipeOverlay"></div>
     <webview id="webview" src="about:blank" nodeintegration useragent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"></webview>
   </div>
 
@@ -565,7 +578,7 @@
       webview.insertCSS(`
         ::-webkit-scrollbar { display: none !important; }
         html, body { scrollbar-width: none !important; }
-        * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
+        * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; touch-action: pan-y !important; }
         input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
       `);
 
@@ -664,48 +677,61 @@
       startScrollPolling();
     });
 
-    // Swipe-Erkennung (links/rechts) zum manuellen Wechseln
+    // Swipe-Erkennung über transparentes Overlay
+    const swipeOverlay = document.getElementById('swipeOverlay');
     let swipeStartX = null;
     let swipeStartY = null;
+    let swipeSwiped = false;
+    let swipeTimeout = null;
 
-    function handleSwipeStart(x, y) {
-      swipeStartX = x;
-      swipeStartY = y;
-    }
+    swipeOverlay.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      swipeStartX = t.clientX;
+      swipeStartY = t.clientY;
+      swipeSwiped = false;
+      // Nach kurzem Timeout ohne Swipe: Overlay transparent für Touch machen
+      // damit die Webview darunter scrollbar/klickbar wird
+      swipeTimeout = setTimeout(() => {
+        if (!swipeSwiped) {
+          swipeOverlay.style.pointerEvents = 'none';
+        }
+      }, 300);
+    }, { passive: true });
 
-    function handleSwipeEnd(x, y) {
-      if (swipeStartX === null) return;
-      const dx = x - swipeStartX;
-      const dy = Math.abs(y - swipeStartY);
-      swipeStartX = null;
-      swipeStartY = null;
+    swipeOverlay.addEventListener('touchmove', (e) => {
+      if (swipeStartX === null || swipeSwiped) return;
+      const t = e.touches[0];
+      const dx = t.clientX - swipeStartX;
+      const dy = Math.abs(t.clientY - swipeStartY);
 
-      // Horizontaler Swipe: dx > 60px und mehr horizontal als vertikal
+      // Horizontaler Swipe erkannt
       if (Math.abs(dx) > 60 && Math.abs(dx) > dy * 1.5) {
+        swipeSwiped = true;
+        clearTimeout(swipeTimeout);
+        e.preventDefault();
+        onInteraction();
         if (dx < 0) {
-          // Links → nächste Seite
           currentIndex = (currentIndex + 1) % config.sites.length;
         } else {
-          // Rechts → vorherige Seite
           currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
         }
         loadSite(currentIndex);
       }
-    }
+    }, { passive: false });
 
-    // Mouse
-    window.addEventListener('mousedown', (e) => handleSwipeStart(e.clientX, e.clientY));
-    window.addEventListener('mouseup', (e) => handleSwipeEnd(e.clientX, e.clientY));
+    swipeOverlay.addEventListener('touchend', () => {
+      clearTimeout(swipeTimeout);
+      swipeStartX = null;
+      swipeStartY = null;
+      swipeSwiped = false;
+      // Overlay wieder aktivieren
+      swipeOverlay.style.pointerEvents = 'auto';
+    }, { passive: true });
 
-    // Touch
-    window.addEventListener('touchstart', (e) => {
-      const t = e.touches[0];
-      handleSwipeStart(t.clientX, t.clientY);
-    }, { passive: true });
-    window.addEventListener('touchend', (e) => {
-      const t = e.changedTouches[0];
-      handleSwipeEnd(t.clientX, t.clientY);
-    }, { passive: true });
+    // Klicks durch Overlay an Webview weiterleiten
+    swipeOverlay.addEventListener('click', () => {
+      onInteraction();
+    });
 
     // Timer-Loop (jede 0.5 Sekunden)
     function startTimerLoop() {
