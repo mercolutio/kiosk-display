@@ -597,22 +597,28 @@
           document.addEventListener('dragstart', (e) => e.preventDefault());
 
           // Swipe-Erkennung innerhalb der Webview
-          let swStartX = null, swStartY = null;
+          let swStartX = null, swStartY = null, swSwiped = false;
           document.addEventListener('touchstart', (e) => {
             const t = e.touches[0];
             swStartX = t.clientX;
             swStartY = t.clientY;
+            swSwiped = false;
           }, { passive: true });
-          document.addEventListener('touchend', (e) => {
-            if (swStartX === null) return;
-            const t = e.changedTouches[0];
+          document.addEventListener('touchmove', (e) => {
+            if (swStartX === null || swSwiped) return;
+            const t = e.touches[0];
             const dx = t.clientX - swStartX;
             const dy = Math.abs(t.clientY - swStartY);
-            swStartX = null;
-            swStartY = null;
             if (Math.abs(dx) > 60 && Math.abs(dx) > dy * 1.5) {
+              swSwiped = true;
+              e.preventDefault();
               try { ipc.sendToHost('swipe', dx < 0 ? 'left' : 'right'); } catch(e) {}
             }
+          }, { passive: false });
+          document.addEventListener('touchend', () => {
+            swStartX = null;
+            swStartY = null;
+            swSwiped = false;
           }, { passive: true });
         })();
       `);
