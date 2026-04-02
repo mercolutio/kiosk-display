@@ -565,17 +565,20 @@
       webview.insertCSS(`
         ::-webkit-scrollbar { display: none !important; }
         html, body { scrollbar-width: none !important; }
+        * { -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important; }
+        input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
       `);
 
-      // Interaktion-Erkennung (Scroll, Touch, Klick)
+      // Interaktion-Erkennung (Scroll, Touch, Klick) + Swipe-Erkennung
       webview.executeJavaScript(`
         (function() {
+          const ipc = require('electron').ipcRenderer;
           let lastNotify = 0;
           function notify() {
             const now = Date.now();
             if (now - lastNotify < 200) return;
             lastNotify = now;
-            try { require('electron').ipcRenderer.sendToHost('interaction'); } catch(e) {}
+            try { ipc.sendToHost('interaction'); } catch(e) {}
           }
           document.addEventListener('scroll', notify, { passive: true, capture: true });
           document.addEventListener('wheel', notify, { passive: true });
@@ -583,6 +586,34 @@
           document.addEventListener('touchmove', notify, { passive: true });
           document.addEventListener('mousedown', notify);
           document.addEventListener('keydown', notify);
+
+          // Text-Selektion komplett verhindern (außer in Eingabefeldern)
+          document.addEventListener('selectstart', (e) => {
+            const tag = (e.target.tagName || '').toLowerCase();
+            if (tag !== 'input' && tag !== 'textarea' && !e.target.isContentEditable) {
+              e.preventDefault();
+            }
+          });
+          document.addEventListener('dragstart', (e) => e.preventDefault());
+
+          // Swipe-Erkennung innerhalb der Webview
+          let swStartX = null, swStartY = null;
+          document.addEventListener('touchstart', (e) => {
+            const t = e.touches[0];
+            swStartX = t.clientX;
+            swStartY = t.clientY;
+          }, { passive: true });
+          document.addEventListener('touchend', (e) => {
+            if (swStartX === null) return;
+            const t = e.changedTouches[0];
+            const dx = t.clientX - swStartX;
+            const dy = Math.abs(t.clientY - swStartY);
+            swStartX = null;
+            swStartY = null;
+            if (Math.abs(dx) > 60 && Math.abs(dx) > dy * 1.5) {
+              try { ipc.sendToHost('swipe', dx < 0 ? 'left' : 'right'); } catch(e) {}
+            }
+          }, { passive: true });
         })();
       `);
     });
@@ -594,6 +625,15 @@
 
     webview.addEventListener('ipc-message', (e) => {
       if (e.channel === 'interaction') onInteraction();
+      if (e.channel === 'swipe') {
+        const direction = e.args[0];
+        if (direction === 'left') {
+          currentIndex = (currentIndex + 1) % config.sites.length;
+        } else {
+          currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
+        }
+        loadSite(currentIndex);
+      }
     });
 
     // Scroll-Erkennung per Polling der Webview-Scrollposition
