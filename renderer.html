@@ -41,16 +41,22 @@
       position: absolute;
       left: 16px;
       display: flex;
-      gap: 6px;
+      gap: 10px;
       align-items: center;
     }
 
     .dot {
-      width: 6px;
-      height: 6px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.2);
-      transition: background 0.3s;
+      transition: background 0.3s, transform 0.15s;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .dot:active {
+      transform: scale(1.4);
     }
 
     .dot.active {
@@ -114,73 +120,53 @@
       display: inline;
     }
 
-    .marquee-bar {
+    .nav-zone {
       position: fixed;
       top: 44px;
-      width: 36px;
+      width: 44px;
       height: calc(100vh - 44px);
       background: #0a0a0a;
       z-index: 900;
-      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
     }
 
-    .marquee-bar.left {
+    .nav-zone.left {
       left: 0;
       border-right: 1px solid rgba(200, 255, 0, 0.15);
     }
 
-    .marquee-bar.right {
+    .nav-zone.right {
       right: 0;
       border-left: 1px solid rgba(200, 255, 0, 0.15);
     }
 
-    .marquee-track {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0;
-      animation: marquee-up 20s linear infinite;
-    }
-
-    .marquee-bar.right .marquee-track {
-      animation: marquee-down 20s linear infinite;
-    }
-
-    .marquee-item {
-      font-family: 'Space Mono', monospace;
-      font-size: 11px;
-      font-weight: 700;
-      color: #c8ff00;
-      writing-mode: vertical-rl;
-      text-orientation: mixed;
-      white-space: nowrap;
-      padding: 20px 0;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-
-    .marquee-item.subtle {
+    .nav-zone .nav-arrow {
+      font-size: 18px;
       color: rgba(200, 255, 0, 0.3);
-      font-weight: 400;
-      font-size: 9px;
-      letter-spacing: 3px;
+      transition: color 0.15s, transform 0.15s;
+      pointer-events: none;
     }
 
-    @keyframes marquee-up {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(-50%); }
+    .nav-zone:active .nav-arrow {
+      color: #c8ff00;
+      transform: scale(1.3);
     }
 
-    @keyframes marquee-down {
-      0% { transform: translateY(-50%); }
-      100% { transform: translateY(0); }
+    .nav-zone:active {
+      background: rgba(200, 255, 0, 0.05);
     }
 
     #webviewContainer {
       position: fixed;
       top: 44px;
-      left: 36px;
-      width: calc(100vw - 72px);
+      left: 44px;
+      width: calc(100vw - 88px);
       height: calc(100vh - 44px);
       overflow: hidden;
     }
@@ -229,8 +215,8 @@
     #keyboard {
       position: fixed;
       bottom: 0;
-      left: 36px;
-      right: 36px;
+      left: 44px;
+      right: 44px;
       background: #111;
       border-top: 1px solid rgba(200, 255, 0, 0.2);
       padding: 12px 10px 16px;
@@ -296,46 +282,12 @@
     </div>
   </div>
 
-  <div class="marquee-bar left">
-    <div class="marquee-track">
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Webdesign</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Branding</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Development</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">SEO</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Webdesign</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Branding</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Development</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">SEO</span>
-    </div>
+  <div class="nav-zone left" id="navLeft">
+    <span class="nav-arrow">&#x276E;</span>
   </div>
 
-  <div class="marquee-bar right">
-    <div class="marquee-track">
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Websites</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Automation</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Marketing</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Design</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Websites</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Automation</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Marketing</span>
-      <span class="marquee-item">layyr.de</span>
-      <span class="marquee-item subtle">Design</span>
-    </div>
+  <div class="nav-zone right" id="navRight">
+    <span class="nav-arrow">&#x276F;</span>
   </div>
 
   <div id="loadingScreen">
@@ -379,6 +331,20 @@
       config.sites.forEach((_, i) => {
         const dot = document.createElement('div');
         dot.className = 'dot' + (i === currentIndex ? ' active' : '');
+        dot.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          if (i !== currentIndex) {
+            currentIndex = i;
+            loadSite(currentIndex);
+          }
+        }, { passive: false });
+        dot.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (i !== currentIndex) {
+            currentIndex = i;
+            loadSite(currentIndex);
+          }
+        });
         dotsContainer.appendChild(dot);
       });
     }
@@ -442,6 +408,36 @@
       pauseTimer();
       resumeAfterScroll();
     }
+
+    function prevSite() {
+      currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
+      loadSite(currentIndex);
+    }
+
+    // Edge zone navigation
+    document.getElementById('navLeft').addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      onInteraction();
+      prevSite();
+    }, { passive: false });
+
+    document.getElementById('navLeft').addEventListener('click', (e) => {
+      e.preventDefault();
+      onInteraction();
+      prevSite();
+    });
+
+    document.getElementById('navRight').addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      onInteraction();
+      nextSite();
+    }, { passive: false });
+
+    document.getElementById('navRight').addEventListener('click', (e) => {
+      e.preventDefault();
+      onInteraction();
+      nextSite();
+    });
 
     // Interaktionen im Webview erkennen + Cookie-Banner entfernen
     webview.addEventListener('dom-ready', () => {
@@ -561,12 +557,11 @@
         })();
       `);
 
-      // Scrollbar ausblenden + touch-action für Swipe-Erkennung
+      // Scrollbar ausblenden + Text-Selektion verhindern
       webview.insertCSS(`
         ::-webkit-scrollbar { display: none !important; }
         html, body {
           scrollbar-width: none !important;
-          touch-action: pan-y !important;
           -webkit-user-select: none !important;
           user-select: none !important;
           -webkit-touch-callout: none !important;
@@ -574,20 +569,10 @@
         input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
       `);
 
-      // Interaktion-Erkennung (Scroll, Touch, Klick) + Swipe-Erkennung
+      // Interaktion-Erkennung (Scroll, Touch, Klick)
       webview.executeJavaScript(`
         (function() {
           const ipc = require('electron').ipcRenderer;
-
-          // touch-action per JS auf ALLE Elemente erzwingen
-          function forceTouchAction() {
-            document.querySelectorAll('*').forEach(el => {
-              el.style.setProperty('touch-action', 'pan-y', 'important');
-            });
-          }
-          forceTouchAction();
-          new MutationObserver(forceTouchAction).observe(document.body, { childList: true, subtree: true });
-
           let lastNotify = 0;
           function notify() {
             const now = Date.now();
@@ -610,32 +595,6 @@
             }
           });
           document.addEventListener('dragstart', (e) => e.preventDefault());
-
-          // Swipe-Erkennung mit capture:true (wir bekommen Events zuerst)
-          let swStartX = null, swStartY = null, swSwiped = false;
-          document.addEventListener('touchstart', (e) => {
-            const t = e.touches[0];
-            swStartX = t.clientX;
-            swStartY = t.clientY;
-            swSwiped = false;
-          }, { passive: true, capture: true });
-          document.addEventListener('touchmove', (e) => {
-            if (swStartX === null || swSwiped) return;
-            const t = e.touches[0];
-            const dx = t.clientX - swStartX;
-            const dy = Math.abs(t.clientY - swStartY);
-            if (Math.abs(dx) > 50 && Math.abs(dx) > dy) {
-              swSwiped = true;
-              e.preventDefault();
-              e.stopPropagation();
-              try { ipc.sendToHost('swipe', dx < 0 ? 'left' : 'right'); } catch(e) {}
-            }
-          }, { passive: false, capture: true });
-          document.addEventListener('touchend', () => {
-            swStartX = null;
-            swStartY = null;
-            swSwiped = false;
-          }, { passive: true, capture: true });
         })();
       `);
     });
@@ -647,15 +606,6 @@
 
     webview.addEventListener('ipc-message', (e) => {
       if (e.channel === 'interaction') onInteraction();
-      if (e.channel === 'swipe') {
-        const direction = e.args[0];
-        if (direction === 'left') {
-          currentIndex = (currentIndex + 1) % config.sites.length;
-        } else {
-          currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
-        }
-        loadSite(currentIndex);
-      }
     });
 
     // Scroll-Erkennung per Polling der Webview-Scrollposition
@@ -679,8 +629,6 @@
       lastScrollY = -1;
       startScrollPolling();
     });
-
-    // (Swipe-Erkennung läuft jetzt innerhalb der Webview per injiziertem JS)
 
     // Timer-Loop (jede 0.5 Sekunden)
     function startTimerLoop() {
