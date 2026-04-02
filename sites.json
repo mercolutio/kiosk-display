@@ -1,0 +1,22 @@
+{
+  "rotationInterval": 5,
+  "idleTimeout": 5,
+  "sites": [
+    {
+      "url": "https://velvetgreen-dienstleistungen.de",
+      "name": "Velvetgreen Dienstleistungen"
+    },
+    {
+      "url": "https://immobilien-doll.de",
+      "name": "Immobilien Doll"
+    },
+    {
+      "url": "https://ausbeultechnik-nord.de",
+      "name": "Ausbeultechnik Nord"
+    },
+    {
+      "url": "https://rexfortis.de",
+      "name": "Rexfortis"
+    }
+  ]
+}

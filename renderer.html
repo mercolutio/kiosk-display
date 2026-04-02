@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Kiosk Browser</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+    body {
+      background: #0a0a0a;
+      overflow: hidden;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    #statusBar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 44px;
+      background: #0a0a0a;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+      z-index: 1000;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(200, 255, 0, 0.15);
+    }
+
+    #dots {
+      position: absolute;
+      left: 16px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      transition: background 0.3s;
+    }
+
+    .dot.active {
+      background: #c8ff00;
+      box-shadow: 0 0 6px rgba(200, 255, 0, 0.4);
+    }
+
+    #siteName {
+      font-family: 'Space Mono', monospace;
+      font-weight: 400;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.5px;
+    }
+
+    #timer {
+      position: absolute;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #timerBar {
+      width: 60px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    #timerProgress {
+      height: 100%;
+      background: #c8ff00;
+      border-radius: 1px;
+      transition: width 0.5s linear;
+    }
+
+    #timerProgress.paused {
+      background: rgba(200, 255, 0, 0.4);
+    }
+
+    #timerText {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.35);
+      min-width: 20px;
+      text-align: right;
+    }
+
+    #pauseIndicator {
+      display: none;
+      color: rgba(200, 255, 0, 0.5);
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    #pauseIndicator.visible {
+      display: inline;
+    }
+
+    .marquee-bar {
+      position: fixed;
+      top: 44px;
+      width: 36px;
+      height: calc(100vh - 44px);
+      background: #0a0a0a;
+      z-index: 900;
+      overflow: hidden;
+    }
+
+    .marquee-bar.left {
+      left: 0;
+      border-right: 1px solid rgba(200, 255, 0, 0.15);
+    }
+
+    .marquee-bar.right {
+      right: 0;
+      border-left: 1px solid rgba(200, 255, 0, 0.15);
+    }
+
+    .marquee-track {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      animation: marquee-up 20s linear infinite;
+    }
+
+    .marquee-bar.right .marquee-track {
+      animation: marquee-down 20s linear infinite;
+    }
+
+    .marquee-item {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #c8ff00;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      white-space: nowrap;
+      padding: 20px 0;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .marquee-item.subtle {
+      color: rgba(200, 255, 0, 0.3);
+      font-weight: 400;
+      font-size: 9px;
+      letter-spacing: 3px;
+    }
+
+    @keyframes marquee-up {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-50%); }
+    }
+
+    @keyframes marquee-down {
+      0% { transform: translateY(-50%); }
+      100% { transform: translateY(0); }
+    }
+
+    #webviewContainer {
+      position: fixed;
+      top: 44px;
+      left: 36px;
+      width: calc(100vw - 72px);
+      height: calc(100vh - 44px);
+      overflow: hidden;
+    }
+
+    webview {
+      width: 100%;
+      height: 100%;
+    }
+
+    #loadingScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #0a0a0a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      z-index: 500;
+      transition: opacity 0.3s;
+    }
+
+    #loadingScreen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top-color: #c8ff00;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* On-Screen Keyboard */
+    #keyboard {
+      position: fixed;
+      bottom: 0;
+      left: 36px;
+      right: 36px;
+      background: #111;
+      border-top: 1px solid rgba(200, 255, 0, 0.2);
+      padding: 12px 10px 16px;
+      z-index: 2000;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      transition: transform 0.25s ease;
+    }
+
+    #keyboard.visible {
+      display: flex;
+    }
+
+    .kb-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .kb-key {
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      background: #1e1e1e;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      min-width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.1s, transform 0.1s;
+      padding: 0 8px;
+    }
+
+    .kb-key:active, .kb-key.pressed {
+      background: #c8ff00;
+      color: #0a0a0a;
+      transform: scale(0.93);
+    }
+
+    .kb-key.wide { min-width: 70px; }
+    .kb-key.space { min-width: 200px; color: rgba(255,255,255,0.3); font-size: 10px; letter-spacing: 2px; }
+    .kb-key.action { background: rgba(200,255,0,0.12); color: #c8ff00; border-color: rgba(200,255,0,0.2); }
+    .kb-key.action:active { background: #c8ff00; color: #0a0a0a; }
+    .kb-key.shift-active { background: rgba(200,255,0,0.2); color: #c8ff00; }
+  </style>
+</head>
+<body>
+  <div id="statusBar">
+    <div id="dots"></div>
+    <span id="siteName">laden...</span>
+    <div id="timer">
+      <span id="pauseIndicator">PAUSE</span>
+      <div id="timerBar">
+        <div id="timerProgress" style="width: 100%"></div>
+      </div>
+      <span id="timerText">5s</span>
+    </div>
+  </div>
+
+  <div class="marquee-bar left">
+    <div class="marquee-track">
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Webdesign</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Branding</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Development</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">SEO</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Webdesign</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Branding</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Development</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">SEO</span>
+    </div>
+  </div>
+
+  <div class="marquee-bar right">
+    <div class="marquee-track">
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Websites</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Automation</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Marketing</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Design</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Websites</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Automation</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Marketing</span>
+      <span class="marquee-item">layyr.de</span>
+      <span class="marquee-item subtle">Design</span>
+    </div>
+  </div>
+
+  <div id="loadingScreen">
+    <div class="spinner"></div>
+    <div>Lade Webseite...</div>
+  </div>
+
+  <div id="webviewContainer">
+    <webview id="webview" src="about:blank" nodeintegration useragent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"></webview>
+  </div>
+
+  <div id="keyboard">
+    <div class="kb-row" id="kb-row-num"></div>
+    <div class="kb-row" id="kb-row-1"></div>
+    <div class="kb-row" id="kb-row-2"></div>
+    <div class="kb-row" id="kb-row-3"></div>
+    <div class="kb-row" id="kb-row-4"></div>
+  </div>
+
+  <script>
+    const webview = document.getElementById('webview');
+    const webviewContainer = document.getElementById('webviewContainer');
+    const siteName = document.getElementById('siteName');
+    const timerProgress = document.getElementById('timerProgress');
+    const timerText = document.getElementById('timerText');
+    const pauseIndicator = document.getElementById('pauseIndicator');
+    const dotsContainer = document.getElementById('dots');
+    const statusBar = document.getElementById('statusBar');
+    const loadingScreen = document.getElementById('loadingScreen');
+
+    let config = null;
+    let currentIndex = 0;
+    let timeRemaining = 30;
+    let isPaused = false;
+    let timerInterval = null;
+    let interactionTimeout = null;
+
+
+    function initDots() {
+      dotsContainer.innerHTML = '';
+      config.sites.forEach((_, i) => {
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (i === currentIndex ? ' active' : '');
+        dotsContainer.appendChild(dot);
+      });
+    }
+
+    function updateDots() {
+      const dots = dotsContainer.querySelectorAll('.dot');
+      dots.forEach((dot, i) => {
+        dot.classList.toggle('active', i === currentIndex);
+      });
+    }
+
+    function loadSite(index) {
+      const site = config.sites[index];
+      try { siteName.textContent = new URL(site.url).hostname; } catch { siteName.textContent = site.name; }
+      loadingScreen.classList.remove('hidden');
+      webview.src = site.url;
+      updateDots();
+      resetTimer();
+
+    }
+
+    function nextSite() {
+      currentIndex = (currentIndex + 1) % config.sites.length;
+      loadSite(currentIndex);
+    }
+
+    function resetTimer() {
+      timeRemaining = config.rotationInterval;
+      isPaused = false;
+      pauseIndicator.classList.remove('visible');
+      timerProgress.classList.remove('paused');
+      updateTimerDisplay();
+    }
+
+    function updateTimerDisplay() {
+      const pct = (timeRemaining / config.rotationInterval) * 100;
+      timerProgress.style.width = pct + '%';
+      timerText.textContent = Math.ceil(timeRemaining) + 's';
+    }
+
+    function pauseTimer() {
+      if (isPaused) return;
+      isPaused = true;
+      pauseIndicator.classList.add('visible');
+      timerProgress.classList.add('paused');
+
+    }
+
+    function resumeAfterScroll() {
+      clearTimeout(interactionTimeout);
+      interactionTimeout = setTimeout(() => {
+        isPaused = false;
+        timeRemaining = config.rotationInterval;
+        pauseIndicator.classList.remove('visible');
+        timerProgress.classList.remove('paused');
+        updateTimerDisplay();
+      }, 1500);
+    }
+
+    function onInteraction() {
+      pauseTimer();
+      resumeAfterScroll();
+    }
+
+    // Interaktionen im Webview erkennen + Cookie-Banner entfernen
+    webview.addEventListener('dom-ready', () => {
+      loadingScreen.classList.add('hidden');
+
+
+      // Cookie-Banner entfernen und Akzeptieren-Buttons klicken
+      webview.executeJavaScript(`
+        (function() {
+          // Bekannte Cookie-Banner Selektoren (CSS)
+          const bannerSelectors = [
+            '#cookie-banner', '#cookie-consent', '#cookiebanner', '#cookie-notice',
+            '#cookieNotice', '#cookie-popup', '#cookie-bar', '#cookie-law',
+            '.cookie-banner', '.cookie-consent', '.cookiebanner', '.cookie-notice',
+            '.cookie-popup', '.cookie-bar', '.cookie-overlay', '.cookie-modal',
+            '.cc-banner', '.cc-window', '.cc-overlay',
+            '.gdpr-banner', '.gdpr-consent', '.gdpr-popup',
+            '#gdpr-banner', '#gdpr-consent',
+            '.consent-banner', '.consent-popup', '.consent-modal',
+            '#consent-banner', '#consent-popup',
+            '#CybotCookiebotDialog', '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
+            '.cky-consent-container', '#cky-consent',
+            '#onetrust-banner-sdk', '#onetrust-consent-sdk',
+            '.otFlat', '#ot-sdk-btn-floating',
+            '#usercentrics-root',
+            '.sp-message-container',
+            '#klaro', '.klaro',
+            '[id*="cookie" i][id*="banner" i]',
+            '[id*="cookie" i][id*="consent" i]',
+            '[class*="cookie" i][class*="banner" i]',
+            '[class*="cookie" i][class*="consent" i]',
+            '[aria-label*="cookie" i]',
+            '[aria-label*="consent" i]',
+          ];
+
+          // Bekannte Akzeptieren-Button Selektoren
+          const acceptSelectors = [
+            '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
+            '#CybotCookiebotDialogBodyButtonAccept',
+            '.cky-btn-accept', '#cky-btn-accept',
+            '#onetrust-accept-btn-handler',
+            '.cc-accept', '.cc-btn.cc-allow', '.cc-dismiss',
+            '[data-action="accept"]',
+            '[data-cookie-accept]',
+            '.consent-accept', '.accept-cookies', '.allow-cookies',
+            '#accept-cookies', '#acceptCookies',
+            'button[id*="accept" i]',
+            'button[class*="accept" i]',
+            'a[id*="accept" i]',
+            'a[class*="accept" i]',
+          ];
+
+          // Auch Buttons mit bestimmtem Text finden
+          const acceptTexts = [
+            'akzeptieren', 'alle akzeptieren', 'accept', 'accept all',
+            'alle cookies akzeptieren', 'allow all', 'allow cookies',
+            'zustimmen', 'alle zustimmen', 'einverstanden', 'ok',
+            'ich stimme zu', 'verstanden', 'alles klar',
+          ];
+
+          function clickAcceptButtons() {
+            // Erst bekannte Selektoren probieren
+            for (const sel of acceptSelectors) {
+              const btn = document.querySelector(sel);
+              if (btn) { btn.click(); return true; }
+            }
+            // Dann Buttons nach Text suchen
+            const buttons = document.querySelectorAll('button, a[role="button"], .btn, [type="submit"]');
+            for (const btn of buttons) {
+              const text = (btn.textContent || '').trim().toLowerCase();
+              if (acceptTexts.some(t => text === t || text.includes(t))) {
+                btn.click();
+                return true;
+              }
+            }
+            return false;
+          }
+
+          function removeBanners() {
+            for (const sel of bannerSelectors) {
+              document.querySelectorAll(sel).forEach(el => {
+                el.style.display = 'none';
+                el.remove();
+              });
+            }
+            // Overlay/Backdrop entfernen
+            document.querySelectorAll('[class*="overlay" i]').forEach(el => {
+              const style = window.getComputedStyle(el);
+              if (style.position === 'fixed' && parseFloat(style.zIndex) > 999) {
+                el.remove();
+              }
+            });
+            // Body-Scroll wiederherstellen
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+          }
+
+          // Mehrfach versuchen (manche Banner laden verzoegert)
+          function killCookies() {
+            clickAcceptButtons();
+            setTimeout(() => { clickAcceptButtons(); removeBanners(); }, 500);
+            setTimeout(() => { clickAcceptButtons(); removeBanners(); }, 1500);
+            setTimeout(() => { clickAcceptButtons(); removeBanners(); }, 3000);
+          }
+
+          killCookies();
+
+          // MutationObserver fuer dynamisch geladene Banner
+          const observer = new MutationObserver(() => {
+            clickAcceptButtons();
+            removeBanners();
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+
+          // Observer nach 10 Sekunden stoppen (Performance)
+          setTimeout(() => observer.disconnect(), 10000);
+        })();
+      `);
+
+      // Scrollbar ausblenden
+      webview.insertCSS(`
+        ::-webkit-scrollbar { display: none !important; }
+        html, body { scrollbar-width: none !important; }
+      `);
+
+      // Interaktion-Erkennung (Scroll, Touch, Klick)
+      webview.executeJavaScript(`
+        (function() {
+          let lastNotify = 0;
+          function notify() {
+            const now = Date.now();
+            if (now - lastNotify < 200) return;
+            lastNotify = now;
+            try { require('electron').ipcRenderer.sendToHost('interaction'); } catch(e) {}
+          }
+          document.addEventListener('scroll', notify, { passive: true, capture: true });
+          document.addEventListener('wheel', notify, { passive: true });
+          document.addEventListener('touchstart', notify, { passive: true });
+          document.addEventListener('touchmove', notify, { passive: true });
+          document.addEventListener('mousedown', notify);
+          document.addEventListener('keydown', notify);
+        })();
+      `);
+    });
+
+    // IPC Messages vom Webview empfangen
+    webview.addEventListener('console-message', (e) => {
+      // Fallback: nicht verwendet
+    });
+
+    webview.addEventListener('ipc-message', (e) => {
+      if (e.channel === 'interaction') onInteraction();
+    });
+
+    // Scroll-Erkennung per Polling der Webview-Scrollposition
+    let lastScrollY = -1;
+    let scrollPollInterval = null;
+
+    function startScrollPolling() {
+      if (scrollPollInterval) return;
+      scrollPollInterval = setInterval(async () => {
+        try {
+          const y = await webview.executeJavaScript('window.scrollY');
+          if (lastScrollY !== -1 && y !== lastScrollY) {
+            onInteraction();
+          }
+          lastScrollY = y;
+        } catch (e) {}
+      }, 150);
+    }
+
+    webview.addEventListener('dom-ready', () => {
+      lastScrollY = -1;
+      startScrollPolling();
+    });
+
+    // Swipe-Erkennung (links/rechts) zum manuellen Wechseln
+    let swipeStartX = null;
+    let swipeStartY = null;
+
+    function handleSwipeStart(x, y) {
+      swipeStartX = x;
+      swipeStartY = y;
+    }
+
+    function handleSwipeEnd(x, y) {
+      if (swipeStartX === null) return;
+      const dx = x - swipeStartX;
+      const dy = Math.abs(y - swipeStartY);
+      swipeStartX = null;
+      swipeStartY = null;
+
+      // Horizontaler Swipe: dx > 60px und mehr horizontal als vertikal
+      if (Math.abs(dx) > 60 && Math.abs(dx) > dy * 1.5) {
+        if (dx < 0) {
+          // Links → nächste Seite
+          currentIndex = (currentIndex + 1) % config.sites.length;
+        } else {
+          // Rechts → vorherige Seite
+          currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
+        }
+        loadSite(currentIndex);
+      }
+    }
+
+    // Mouse
+    window.addEventListener('mousedown', (e) => handleSwipeStart(e.clientX, e.clientY));
+    window.addEventListener('mouseup', (e) => handleSwipeEnd(e.clientX, e.clientY));
+
+    // Touch
+    window.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      handleSwipeStart(t.clientX, t.clientY);
+    }, { passive: true });
+    window.addEventListener('touchend', (e) => {
+      const t = e.changedTouches[0];
+      handleSwipeEnd(t.clientX, t.clientY);
+    }, { passive: true });
+
+    // Timer-Loop (jede 0.5 Sekunden)
+    function startTimerLoop() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (!isPaused && config) {
+          timeRemaining -= 0.5;
+          updateTimerDisplay();
+          if (timeRemaining <= 0) {
+            nextSite();
+          }
+        }
+      }, 500);
+    }
+
+    // Config empfangen und starten
+    window.kiosk.onConfig((cfg) => {
+      config = cfg;
+      if (config.sites.length === 0) {
+        siteName.textContent = 'Keine Seiten konfiguriert';
+        return;
+      }
+      initDots();
+      loadSite(0);
+      startTimerLoop();
+    });
+    // ── On-Screen Keyboard ──────────────────────────────────────────
+    const keyboard = document.getElementById('keyboard');
+    let kbShift = false;
+    let kbCaps = false;
+
+    const layouts = {
+      num:    ['1','2','3','4','5','6','7','8','9','0','-'],
+      row1:   ['q','w','e','r','t','z','u','i','o','p','ü'],
+      row2:   ['a','s','d','f','g','h','j','k','l','ö','ä'],
+      row3:   ['y','x','c','v','b','n','m',',','.'],
+    };
+
+    const shiftMap = {
+      '1':'!','2':'"','3':'§','4':'$','5':'%','6':'&','7':'/','8':'(','9':')','0':'=','-':'_',
+      'q':'Q','w':'W','e':'E','r':'R','t':'T','z':'Z','u':'U','i':'I','o':'O','p':'P','ü':'Ü',
+      'a':'A','s':'S','d':'D','f':'F','g':'G','h':'H','j':'J','k':'K','l':'L','ö':'Ö','ä':'Ä',
+      'y':'Y','x':'X','c':'C','v':'V','b':'B','n':'N','m':'M',',':';','.':':'
+    };
+
+    function buildKeyboard() {
+      function makeKey(label, action, extraClass = '') {
+        const btn = document.createElement('button');
+        btn.className = 'kb-key ' + extraClass;
+        btn.textContent = label;
+        btn.addEventListener('mousedown', (e) => { e.preventDefault(); action(); });
+        return btn;
+      }
+
+      function charKey(ch) {
+        return makeKey(ch, () => typeChar(ch));
+      }
+
+      // Num row
+      const numRow = document.getElementById('kb-row-num');
+      layouts.num.forEach(ch => numRow.appendChild(charKey(ch)));
+      numRow.appendChild(makeKey('⌫', () => sendBackspace(), 'action'));
+
+      // Row 1
+      const r1 = document.getElementById('kb-row-1');
+      layouts.row1.forEach(ch => r1.appendChild(charKey(ch)));
+
+      // Row 2
+      const r2 = document.getElementById('kb-row-2');
+      layouts.row2.forEach(ch => r2.appendChild(charKey(ch)));
+
+      // Row 3 (with Shift)
+      const r3 = document.getElementById('kb-row-3');
+      r3.appendChild(makeKey('⇧', toggleShift, 'action wide' + (kbShift ? ' shift-active' : '')));
+      layouts.row3.forEach(ch => r3.appendChild(charKey(ch)));
+      r3.appendChild(makeKey('⇧', toggleShift, 'action wide' + (kbShift ? ' shift-active' : '')));
+
+      // Row 4 (space, close)
+      const r4 = document.getElementById('kb-row-4');
+      r4.appendChild(makeKey('@', () => typeChar('@'), 'wide'));
+      r4.appendChild(makeKey('SPACE', () => typeChar(' '), 'space'));
+      r4.appendChild(makeKey('↵', () => sendEnter(), 'action wide'));
+      r4.appendChild(makeKey('✕', hideKeyboard, 'action wide'));
+    }
+
+    function refreshKeyboard() {
+      ['kb-row-num','kb-row-1','kb-row-2','kb-row-3','kb-row-4'].forEach(id => {
+        document.getElementById(id).innerHTML = '';
+      });
+      buildKeyboard();
+    }
+
+    function toggleShift() {
+      kbShift = !kbShift;
+      refreshKeyboard();
+    }
+
+    function typeChar(ch) {
+      const char = (kbShift || kbCaps) ? (shiftMap[ch] || ch.toUpperCase()) : ch;
+      webview.executeJavaScript(`
+        (function() {
+          const el = document.activeElement;
+          if (!el) return;
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') ||
+                                         Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+          const start = el.selectionStart != null ? el.selectionStart : (el.value || '').length;
+          const end   = el.selectionEnd   != null ? el.selectionEnd   : start;
+          const val   = el.value || '';
+          const newVal = val.slice(0, start) + ${JSON.stringify(char)} + val.slice(end);
+          if (nativeInputValueSetter) nativeInputValueSetter.set.call(el, newVal);
+          else el.value = newVal;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          const pos = start + 1;
+          if (el.setSelectionRange) el.setSelectionRange(pos, pos);
+        })();
+      `);
+      if (kbShift) { kbShift = false; refreshKeyboard(); }
+    }
+
+    function sendBackspace() {
+      webview.executeJavaScript(`
+        (function() {
+          const el = document.activeElement;
+          if (!el) return;
+          const start = el.selectionStart != null ? el.selectionStart : (el.value || '').length;
+          const end   = el.selectionEnd   != null ? el.selectionEnd   : start;
+          const val   = el.value || '';
+          const newVal = start !== end ? val.slice(0, start) + val.slice(end)
+                                       : val.slice(0, Math.max(0, start - 1)) + val.slice(start);
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value') ||
+                                         Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+          if (nativeInputValueSetter) nativeInputValueSetter.set.call(el, newVal);
+          else el.value = newVal;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          const pos = start !== end ? start : Math.max(0, start - 1);
+          if (el.setSelectionRange) el.setSelectionRange(pos, pos);
+        })();
+      `);
+    }
+
+    function sendEnter() {
+      webview.executeJavaScript(`
+        (function() {
+          const el = document.activeElement;
+          if (!el) return;
+          el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+          el.dispatchEvent(new KeyboardEvent('keyup',   { key: 'Enter', code: 'Enter', bubbles: true }));
+          if (el.form) el.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        })();
+      `);
+      hideKeyboard();
+    }
+
+    function showKeyboard() {
+      keyboard.classList.add('visible');
+      // Webview nach oben schieben damit das Input-Feld nicht verdeckt wird
+      const kbHeight = keyboard.offsetHeight || 220;
+      webviewContainer.style.height = `calc(100vh - 44px - ${kbHeight}px)`;
+    }
+
+    function hideKeyboard() {
+      keyboard.classList.remove('visible');
+      webviewContainer.style.height = '';
+      webview.executeJavaScript(`if (document.activeElement) document.activeElement.blur();`);
+    }
+
+    // Input-Fokus per Polling erkennen
+    let inputFocused = false;
+
+    setInterval(async () => {
+      if (!webview.src || webview.src === 'about:blank') return;
+      try {
+        const tag = await webview.executeJavaScript(
+          `(function(){ const el = document.activeElement; if (!el) return ''; return el.tagName + '|' + el.type; })()`
+        );
+        const isInput = tag && (
+          tag.startsWith('INPUT') ||
+          tag.startsWith('TEXTAREA') ||
+          tag.includes('contenteditable')
+        );
+        if (isInput && !inputFocused) {
+          inputFocused = true;
+          showKeyboard();
+        } else if (!isInput && inputFocused) {
+          inputFocused = false;
+          hideKeyboard();
+        }
+      } catch(e) {}
+    }, 300);
+
+    buildKeyboard();
+    // ── Ende On-Screen Keyboard ─────────────────────────────────────
+  </script>
+</body>
+</html>

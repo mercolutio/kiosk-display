@@ -1,0 +1,13 @@
+{
+  "name": "kiosk-browser",
+  "version": "1.0.0",
+  "description": "Kiosk Browser fuer Raspberry Pi - zeigt Webseiten im Rotation an",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:fullscreen": "electron . --fullscreen"
+  },
+  "dependencies": {
+    "electron": "^35.0.0"
+  }
+}
