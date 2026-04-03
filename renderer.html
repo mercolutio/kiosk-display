@@ -571,107 +571,51 @@
         input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
       `);
 
-      // Interaktion-Erkennung + Scroll-Simulation
-      // (Der USB-Touchscreen hat kein natives Scroll und sendet ggf. Maus-Events)
+      // Scroll-Simulation + Interaktion-Erkennung
+      // (kein require('electron') — nutzt console.log fuer IPC)
       webview.executeJavaScript(`
         (function() {
-          const ipc = require('electron').ipcRenderer;
-          let lastNotify = 0;
-          function notify() {
-            const now = Date.now();
-            if (now - lastNotify < 200) return;
-            lastNotify = now;
-            try { ipc.sendToHost('interaction'); } catch(e) {}
-          }
-          document.addEventListener('scroll', notify, { passive: true, capture: true });
-          document.addEventListener('wheel', notify, { passive: true });
-          document.addEventListener('keydown', notify);
-
-          // Text-Selektion verhindern (außer in Eingabefeldern)
-          document.addEventListener('selectstart', (e) => {
-            const tag = (e.target.tagName || '').toLowerCase();
-            if (tag !== 'input' && tag !== 'textarea' && !e.target.isContentEditable) {
-              e.preventDefault();
-            }
+          document.addEventListener('selectstart', function(e) {
+            var tag = (e.target.tagName || '').toLowerCase();
+            if (tag !== 'input' && tag !== 'textarea') e.preventDefault();
           });
-          document.addEventListener('dragstart', (e) => e.preventDefault());
+          document.addEventListener('dragstart', function(e) { e.preventDefault(); });
 
-          // Scroll-Simulation (funktioniert mit Touch UND Maus-Events)
-          let startY = null, lastY = null, scrolling = false, isDown = false;
+          var startY = null, lastY = null, scrolling = false, isDown = false;
 
-          function onPointerDown(y) {
-            startY = y;
-            lastY = y;
-            scrolling = false;
-            isDown = true;
-            notify();
-          }
-
-          function onPointerMove(y, e) {
+          function down(y) { startY = y; lastY = y; scrolling = false; isDown = true; console.log('KIOSK:interaction'); }
+          function move(y, e) {
             if (!isDown || lastY === null) return;
-            const dy = lastY - y;
-            if (!scrolling && Math.abs(y - startY) > 5) {
-              scrolling = true;
-            }
+            var dy = lastY - y;
+            if (!scrolling && Math.abs(y - startY) > 5) scrolling = true;
             if (scrolling) {
               window.scrollBy(0, dy);
-              if (e && e.preventDefault) e.preventDefault();
-              notify();
+              if (e.preventDefault) e.preventDefault();
+              console.log('KIOSK:interaction');
             }
             lastY = y;
           }
+          function up() { startY = null; lastY = null; scrolling = false; isDown = false; }
 
-          function onPointerUp() {
-            startY = null;
-            lastY = null;
-            scrolling = false;
-            isDown = false;
-          }
+          document.addEventListener('pointerdown', function(e) { down(e.clientY); }, true);
+          document.addEventListener('pointermove', function(e) { if (isDown) move(e.clientY, e); }, true);
+          document.addEventListener('pointerup', up, true);
+          document.addEventListener('mousedown', function(e) { down(e.clientY); }, true);
+          document.addEventListener('mousemove', function(e) { move(e.clientY, e); }, true);
+          document.addEventListener('mouseup', up, true);
+          document.addEventListener('touchstart', function(e) { down(e.touches[0].clientY); }, {capture:true, passive:true});
+          document.addEventListener('touchmove', function(e) { move(e.touches[0].clientY, e); }, {capture:true, passive:false});
+          document.addEventListener('touchend', up, {capture:true, passive:true});
 
-          // DEBUG: Welche Events kommen an?
-          ['touchstart','touchmove','touchend','mousedown','mousemove','mouseup','pointerdown','pointermove','pointerup'].forEach(evt => {
-            document.addEventListener(evt, (e) => {
-              console.log('EVENT: ' + evt + ' y=' + (e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || '?'));
-            }, { capture: true });
-          });
-
-          // Touch-Events
-          document.addEventListener('touchstart', (e) => {
-            onPointerDown(e.touches[0].clientY);
-          }, { passive: true, capture: true });
-          document.addEventListener('touchmove', (e) => {
-            onPointerMove(e.touches[0].clientY, e);
-          }, { passive: false, capture: true });
-          document.addEventListener('touchend', onPointerUp, { passive: true, capture: true });
-
-          // Maus-Events (manche Touchscreens senden nur diese)
-          document.addEventListener('mousedown', (e) => {
-            onPointerDown(e.clientY);
-          }, { capture: true });
-          document.addEventListener('mousemove', (e) => {
-            onPointerMove(e.clientY, e);
-          }, { capture: true });
-          document.addEventListener('mouseup', onPointerUp, { capture: true });
-
-          // Pointer-Events (Fallback)
-          document.addEventListener('pointerdown', (e) => {
-            onPointerDown(e.clientY);
-          }, { capture: true });
-          document.addEventListener('pointermove', (e) => {
-            if (isDown) onPointerMove(e.clientY, e);
-          }, { capture: true });
-          document.addEventListener('pointerup', onPointerUp, { capture: true });
+          console.log('KIOSK:scroll-sim-loaded');
         })();
       `);
     });
 
     // IPC Messages vom Webview empfangen
     webview.addEventListener('console-message', (e) => {
-      if (e.message.startsWith('EVENT:')) console.log('[webview] ' + e.message);
-    });
-
-    webview.addEventListener('ipc-message', (e) => {
-      if (e.channel === 'interaction') onInteraction();
+      if (e.message === 'KIOSK:interaction') onInteraction();
+      if (e.message === 'KIOSK:scroll-sim-loaded') console.log('Scroll-Simulation geladen');
     });
 
     // Scroll-Erkennung per Polling der Webview-Scrollposition
