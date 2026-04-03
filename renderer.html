@@ -64,6 +64,28 @@
       box-shadow: 0 0 6px rgba(200, 255, 0, 0.4);
     }
 
+    .nav-btn {
+      background: none;
+      border: 1px solid rgba(200, 255, 0, 0.2);
+      color: rgba(200, 255, 0, 0.5);
+      font-size: 16px;
+      width: 36px;
+      height: 30px;
+      border-radius: 6px;
+      cursor: pointer;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      margin: 0 2px;
+    }
+
+    .nav-btn:active {
+      background: #c8ff00;
+      color: #0a0a0a;
+    }
+
     #siteName {
       font-family: 'Space Mono', monospace;
       font-weight: 400;
@@ -120,53 +142,11 @@
       display: inline;
     }
 
-    .nav-zone {
-      position: fixed;
-      top: 44px;
-      width: 44px;
-      height: calc(100vh - 44px);
-      background: #0a0a0a;
-      z-index: 900;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: manipulation;
-    }
-
-    .nav-zone.left {
-      left: 0;
-      border-right: 1px solid rgba(200, 255, 0, 0.15);
-    }
-
-    .nav-zone.right {
-      right: 0;
-      border-left: 1px solid rgba(200, 255, 0, 0.15);
-    }
-
-    .nav-zone .nav-arrow {
-      font-size: 18px;
-      color: rgba(200, 255, 0, 0.3);
-      transition: color 0.15s, transform 0.15s;
-      pointer-events: none;
-    }
-
-    .nav-zone:active .nav-arrow {
-      color: #c8ff00;
-      transform: scale(1.3);
-    }
-
-    .nav-zone:active {
-      background: rgba(200, 255, 0, 0.05);
-    }
-
     #webviewContainer {
       position: fixed;
       top: 44px;
-      left: 44px;
-      width: calc(100vw - 88px);
+      left: 0;
+      width: 100vw;
       height: calc(100vh - 44px);
       overflow: hidden;
     }
@@ -217,8 +197,8 @@
     #keyboard {
       position: fixed;
       bottom: 0;
-      left: 44px;
-      right: 44px;
+      left: 0;
+      right: 0;
       background: #111;
       border-top: 1px solid rgba(200, 255, 0, 0.2);
       padding: 12px 10px 16px;
@@ -274,6 +254,8 @@
 <body>
   <div id="statusBar">
     <div id="dots"></div>
+    <button id="btnPrev" class="nav-btn">&#x276E;</button>
+    <button id="btnNext" class="nav-btn">&#x276F;</button>
     <span id="siteName">laden...</span>
     <div id="timer">
       <span id="pauseIndicator">PAUSE</span>
@@ -284,13 +266,6 @@
     </div>
   </div>
 
-  <div class="nav-zone left" id="navLeft">
-    <span class="nav-arrow">&#x276E;</span>
-  </div>
-
-  <div class="nav-zone right" id="navRight">
-    <span class="nav-arrow">&#x276F;</span>
-  </div>
 
   <div id="loadingScreen">
     <div class="spinner"></div>
@@ -414,35 +389,16 @@
       resumeAfterScroll();
     }
 
+    // Navigation Buttons
     function prevSite() {
       currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
       loadSite(currentIndex);
     }
 
-    // Edge zone navigation
-    document.getElementById('navLeft').addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      onInteraction();
-      prevSite();
-    }, { passive: false });
-
-    document.getElementById('navLeft').addEventListener('click', (e) => {
-      e.preventDefault();
-      onInteraction();
-      prevSite();
-    });
-
-    document.getElementById('navRight').addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      onInteraction();
-      nextSite();
-    }, { passive: false });
-
-    document.getElementById('navRight').addEventListener('click', (e) => {
-      e.preventDefault();
-      onInteraction();
-      nextSite();
-    });
+    document.getElementById('btnPrev').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); prevSite(); });
+    document.getElementById('btnNext').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); nextSite(); });
+    document.getElementById('btnPrev').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); prevSite(); }, { passive: false });
+    document.getElementById('btnNext').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); nextSite(); }, { passive: false });
 
     // Interaktionen im Webview erkennen + Cookie-Banner entfernen
     webview.addEventListener('dom-ready', () => {
@@ -563,8 +519,8 @@
       } catch(e) {}
       `).catch(function(){});
 
-      // Scrollbar ausblenden
-      try { webview.insertCSS('::-webkit-scrollbar{display:none!important}html,body{scrollbar-width:none!important}'); } catch(e) {}
+      // Scrollbar sichtbar + Animationen/Videos deaktivieren fuer Performance
+      try { webview.insertCSS('::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}html,body{overflow-y:auto!important}*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;scroll-behavior:auto!important}video,iframe[src*="youtube"],iframe[src*="vimeo"]{display:none!important}'); } catch(e) {}
     });
 
     // Scroll-Simulation laeuft jetzt ueber webview-preload.js
