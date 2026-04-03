@@ -120,48 +120,54 @@
       display: inline;
     }
 
-    #bottomBar {
+    .nav-zone {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 44px;
+      top: 44px;
+      width: 44px;
+      height: calc(100vh - 44px);
       background: #0a0a0a;
+      z-index: 900;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 16px;
-      z-index: 1000;
-      border-top: 1px solid rgba(200, 255, 0, 0.15);
-    }
-
-    .nav-btn {
-      background: none;
-      border: 1px solid rgba(200, 255, 0, 0.2);
-      color: rgba(200, 255, 0, 0.5);
-      font-size: 20px;
-      width: 120px;
-      height: 34px;
-      border-radius: 8px;
       cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
       touch-action: manipulation;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
     }
 
-    .nav-btn:active {
-      background: #c8ff00;
-      color: #0a0a0a;
+    .nav-zone.left {
+      left: 0;
+      border-right: 1px solid rgba(200, 255, 0, 0.15);
+    }
+
+    .nav-zone.right {
+      right: 0;
+      border-left: 1px solid rgba(200, 255, 0, 0.15);
+    }
+
+    .nav-zone .nav-arrow {
+      font-size: 18px;
+      color: rgba(200, 255, 0, 0.3);
+      transition: color 0.15s, transform 0.15s;
+      pointer-events: none;
+    }
+
+    .nav-zone:active .nav-arrow {
+      color: #c8ff00;
+      transform: scale(1.3);
+    }
+
+    .nav-zone:active {
+      background: rgba(200, 255, 0, 0.05);
     }
 
     #webviewContainer {
       position: fixed;
       top: 44px;
-      left: 0;
-      width: 100vw;
-      height: calc(100vh - 88px);
+      left: 44px;
+      width: calc(100vw - 88px);
+      height: calc(100vh - 44px);
       overflow: hidden;
     }
 
@@ -211,8 +217,8 @@
     #keyboard {
       position: fixed;
       bottom: 0;
-      left: 0;
-      right: 0;
+      left: 44px;
+      right: 44px;
       background: #111;
       border-top: 1px solid rgba(200, 255, 0, 0.2);
       padding: 12px 10px 16px;
@@ -278,9 +284,12 @@
     </div>
   </div>
 
-  <div id="bottomBar">
-    <button id="btnPrev" class="nav-btn">&#x276E;</button>
-    <button id="btnNext" class="nav-btn">&#x276F;</button>
+  <div class="nav-zone left" id="navLeft">
+    <span class="nav-arrow">&#x276E;</span>
+  </div>
+
+  <div class="nav-zone right" id="navRight">
+    <span class="nav-arrow">&#x276F;</span>
   </div>
 
   <div id="loadingScreen">
@@ -410,11 +419,30 @@
       loadSite(currentIndex);
     }
 
-    // Bottom-Bar Navigation
-    document.getElementById('btnPrev').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); prevSite(); });
-    document.getElementById('btnNext').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); nextSite(); });
-    document.getElementById('btnPrev').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); prevSite(); }, { passive: false });
-    document.getElementById('btnNext').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); nextSite(); }, { passive: false });
+    // Edge zone navigation
+    document.getElementById('navLeft').addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      onInteraction();
+      prevSite();
+    }, { passive: false });
+
+    document.getElementById('navLeft').addEventListener('click', (e) => {
+      e.preventDefault();
+      onInteraction();
+      prevSite();
+    });
+
+    document.getElementById('navRight').addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      onInteraction();
+      nextSite();
+    }, { passive: false });
+
+    document.getElementById('navRight').addEventListener('click', (e) => {
+      e.preventDefault();
+      onInteraction();
+      nextSite();
+    });
 
     // Interaktionen im Webview erkennen + Cookie-Banner entfernen
     webview.addEventListener('dom-ready', () => {
@@ -535,8 +563,8 @@
       } catch(e) {}
       `).catch(function(){});
 
-      // Scrollbar sichtbar und touch-freundlich machen
-      try { webview.insertCSS('::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}html,body{overflow-y:auto!important}'); } catch(e) {}
+      // Scrollbar ausblenden
+      try { webview.insertCSS('::-webkit-scrollbar{display:none!important}html,body{scrollbar-width:none!important}'); } catch(e) {}
     });
 
     // Scroll-Simulation laeuft jetzt ueber webview-preload.js
