@@ -120,53 +120,11 @@
       display: inline;
     }
 
-    .nav-zone {
-      position: fixed;
-      top: 44px;
-      width: 44px;
-      height: calc(100vh - 44px);
-      background: #0a0a0a;
-      z-index: 900;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: manipulation;
-    }
-
-    .nav-zone.left {
-      left: 0;
-      border-right: 1px solid rgba(200, 255, 0, 0.15);
-    }
-
-    .nav-zone.right {
-      right: 0;
-      border-left: 1px solid rgba(200, 255, 0, 0.15);
-    }
-
-    .nav-zone .nav-arrow {
-      font-size: 18px;
-      color: rgba(200, 255, 0, 0.3);
-      transition: color 0.15s, transform 0.15s;
-      pointer-events: none;
-    }
-
-    .nav-zone:active .nav-arrow {
-      color: #c8ff00;
-      transform: scale(1.3);
-    }
-
-    .nav-zone:active {
-      background: rgba(200, 255, 0, 0.05);
-    }
-
     #webviewContainer {
       position: fixed;
       top: 44px;
-      left: 44px;
-      width: calc(100vw - 88px);
+      left: 0;
+      width: 100vw;
       height: calc(100vh - 44px);
       overflow: hidden;
     }
@@ -217,8 +175,8 @@
     #keyboard {
       position: fixed;
       bottom: 0;
-      left: 44px;
-      right: 44px;
+      left: 0;
+      right: 0;
       background: #111;
       border-top: 1px solid rgba(200, 255, 0, 0.2);
       padding: 12px 10px 16px;
@@ -284,13 +242,6 @@
     </div>
   </div>
 
-  <div class="nav-zone left" id="navLeft">
-    <span class="nav-arrow">&#x276E;</span>
-  </div>
-
-  <div class="nav-zone right" id="navRight">
-    <span class="nav-arrow">&#x276F;</span>
-  </div>
 
   <div id="loadingScreen">
     <div class="spinner"></div>
@@ -414,35 +365,7 @@
       resumeAfterScroll();
     }
 
-    function prevSite() {
-      currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
-      loadSite(currentIndex);
-    }
-
-    // Edge zone navigation
-    document.getElementById('navLeft').addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      onInteraction();
-      prevSite();
-    }, { passive: false });
-
-    document.getElementById('navLeft').addEventListener('click', (e) => {
-      e.preventDefault();
-      onInteraction();
-      prevSite();
-    });
-
-    document.getElementById('navRight').addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      onInteraction();
-      nextSite();
-    }, { passive: false });
-
-    document.getElementById('navRight').addEventListener('click', (e) => {
-      e.preventDefault();
-      onInteraction();
-      nextSite();
-    });
+    // Navigation laeuft ueber klickbare Dots in der Statusleiste
 
     // Interaktionen im Webview erkennen + Cookie-Banner entfernen
     webview.addEventListener('dom-ready', () => {
