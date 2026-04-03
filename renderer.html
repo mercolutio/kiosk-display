@@ -571,7 +571,8 @@
         input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
       `);
 
-      // Interaktion-Erkennung (Scroll, Touch, Klick)
+      // Interaktion-Erkennung + Touch-Scrolling simulieren
+      // (Der USB-Touchscreen hat kein natives Scroll — wir simulieren es per JS)
       webview.executeJavaScript(`
         (function() {
           const ipc = require('electron').ipcRenderer;
@@ -584,8 +585,6 @@
           }
           document.addEventListener('scroll', notify, { passive: true, capture: true });
           document.addEventListener('wheel', notify, { passive: true });
-          document.addEventListener('touchstart', notify, { passive: true });
-          document.addEventListener('touchmove', notify, { passive: true });
           document.addEventListener('mousedown', notify);
           document.addEventListener('keydown', notify);
 
@@ -597,6 +596,40 @@
             }
           });
           document.addEventListener('dragstart', (e) => e.preventDefault());
+
+          // Touch-Scrolling simulieren
+          let tStartY = null, tLastY = null, tScrolling = false;
+          document.addEventListener('touchstart', (e) => {
+            const t = e.touches[0];
+            tStartY = t.clientY;
+            tLastY = t.clientY;
+            tScrolling = false;
+            notify();
+          }, { passive: true, capture: true });
+
+          document.addEventListener('touchmove', (e) => {
+            if (tLastY === null) return;
+            const t = e.touches[0];
+            const dy = tLastY - t.clientY;
+
+            // Nach 5px Bewegung: Scrolling starten
+            if (!tScrolling && Math.abs(t.clientY - tStartY) > 5) {
+              tScrolling = true;
+            }
+
+            if (tScrolling) {
+              window.scrollBy(0, dy);
+              e.preventDefault();
+              notify();
+            }
+            tLastY = t.clientY;
+          }, { passive: false, capture: true });
+
+          document.addEventListener('touchend', () => {
+            tStartY = null;
+            tLastY = null;
+            tScrolling = false;
+          }, { passive: true, capture: true });
         })();
       `);
     });
