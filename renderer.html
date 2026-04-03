@@ -64,6 +64,28 @@
       box-shadow: 0 0 6px rgba(200, 255, 0, 0.4);
     }
 
+    .nav-btn {
+      background: none;
+      border: 1px solid rgba(200, 255, 0, 0.2);
+      color: rgba(200, 255, 0, 0.5);
+      font-size: 16px;
+      width: 36px;
+      height: 30px;
+      border-radius: 6px;
+      cursor: pointer;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      margin: 0 2px;
+    }
+
+    .nav-btn:active {
+      background: #c8ff00;
+      color: #0a0a0a;
+    }
+
     #siteName {
       font-family: 'Space Mono', monospace;
       font-weight: 400;
@@ -232,6 +254,8 @@
 <body>
   <div id="statusBar">
     <div id="dots"></div>
+    <button id="btnPrev" class="nav-btn">&#x276E;</button>
+    <button id="btnNext" class="nav-btn">&#x276F;</button>
     <span id="siteName">laden...</span>
     <div id="timer">
       <span id="pauseIndicator">PAUSE</span>
@@ -365,7 +389,16 @@
       resumeAfterScroll();
     }
 
-    // Navigation laeuft ueber klickbare Dots in der Statusleiste
+    // Navigation Buttons
+    function prevSite() {
+      currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
+      loadSite(currentIndex);
+    }
+
+    document.getElementById('btnPrev').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); prevSite(); });
+    document.getElementById('btnNext').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); nextSite(); });
+    document.getElementById('btnPrev').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); prevSite(); }, { passive: false });
+    document.getElementById('btnNext').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); nextSite(); }, { passive: false });
 
     // Interaktionen im Webview erkennen + Cookie-Banner entfernen
     webview.addEventListener('dom-ready', () => {
