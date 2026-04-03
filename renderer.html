@@ -563,8 +563,8 @@
       } catch(e) {}
       `).catch(function(){});
 
-      // Scrollbar ausblenden
-      try { webview.insertCSS('::-webkit-scrollbar{display:none!important}html,body{scrollbar-width:none!important}'); } catch(e) {}
+      // Scrollbar sichtbar und touch-freundlich machen
+      try { webview.insertCSS('::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}html,body{overflow-y:auto!important}'); } catch(e) {}
     });
 
     // Scroll-Simulation laeuft jetzt ueber webview-preload.js
