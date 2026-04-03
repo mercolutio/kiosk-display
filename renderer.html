@@ -170,6 +170,14 @@
       height: 100%;
       touch-action: auto;
       -webkit-overflow-scrolling: touch;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    webview.hidden-wv {
+      visibility: hidden;
+      pointer-events: none;
     }
 
     #loadingScreen {
@@ -184,8 +192,8 @@
       align-items: center;
       justify-content: center;
       color: #fff;
-      z-index: 500;
-      transition: opacity 0.3s;
+      z-index: 2000;
+      transition: opacity 0.5s;
     }
 
     #loadingScreen.hidden {
@@ -205,6 +213,30 @@
 
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+
+    #loadingText {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 8px;
+    }
+
+    #loadingProgress {
+      width: 200px;
+      height: 3px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      margin-top: 16px;
+      overflow: hidden;
+    }
+
+    #loadingProgressBar {
+      height: 100%;
+      background: #c8ff00;
+      border-radius: 2px;
+      transition: width 0.3s;
+      width: 0%;
     }
 
     /* On-Screen Keyboard */
@@ -283,15 +315,14 @@
     <button id="btnNext" class="nav-btn">&#x276F;</button>
   </div>
 
-
   <div id="loadingScreen">
     <div class="spinner"></div>
-    <div>Lade Webseite...</div>
+    <div>Webseiten werden geladen...</div>
+    <div id="loadingText">0 / 0</div>
+    <div id="loadingProgress"><div id="loadingProgressBar"></div></div>
   </div>
 
-  <div id="webviewContainer">
-    <webview id="webview" src="about:blank" nodeintegration useragent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"></webview>
-  </div>
+  <div id="webviewContainer"></div>
 
   <div id="keyboard">
     <div class="kb-row" id="kb-row-num"></div>
@@ -302,18 +333,19 @@
   </div>
 
   <script>
-    const webview = document.getElementById('webview');
-    // Preload-Script fuer Scroll-Simulation setzen (braucht absoluten Pfad)
     const path = require('path');
-    webview.setAttribute('preload', 'file://' + path.join(__dirname, 'webview-preload.js'));
+    const preloadPath = 'file://' + path.join(__dirname, 'webview-preload.js');
     const webviewContainer = document.getElementById('webviewContainer');
     const siteName = document.getElementById('siteName');
     const timerProgress = document.getElementById('timerProgress');
     const timerText = document.getElementById('timerText');
     const pauseIndicator = document.getElementById('pauseIndicator');
     const dotsContainer = document.getElementById('dots');
-    const statusBar = document.getElementById('statusBar');
     const loadingScreen = document.getElementById('loadingScreen');
+    const loadingText = document.getElementById('loadingText');
+    const loadingProgressBar = document.getElementById('loadingProgressBar');
+    const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+    const SCROLLBAR_CSS = '::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}html,body{overflow-y:auto!important}';
 
     let config = null;
     let currentIndex = 0;
@@ -321,7 +353,59 @@
     let isPaused = false;
     let timerInterval = null;
     let interactionTimeout = null;
+    let webviews = []; // eine Webview pro Seite
 
+    // Webview fuer eine Seite erstellen
+    function createWebview(site, index) {
+      const wv = document.createElement('webview');
+      wv.setAttribute('src', site.url);
+      wv.setAttribute('useragent', UA);
+      wv.setAttribute('preload', preloadPath);
+      wv.setAttribute('nodeintegration', '');
+      wv.className = 'hidden-wv';
+      wv.dataset.index = index;
+
+      wv.addEventListener('dom-ready', () => {
+        try { wv.insertCSS(SCROLLBAR_CSS); } catch(e) {}
+      }, { once: true });
+
+      wv.addEventListener('console-message', (e) => {
+        if (e.message === 'KIOSK:interaction') onInteraction();
+      });
+
+      webviewContainer.appendChild(wv);
+      return wv;
+    }
+
+    // Alle Webviews vorladen
+    function preloadAllSites() {
+      let loaded = 0;
+      const total = config.sites.length;
+      loadingText.textContent = '0 / ' + total;
+
+      return new Promise((resolve) => {
+        config.sites.forEach((site, i) => {
+          const wv = createWebview(site, i);
+          webviews.push(wv);
+
+          wv.addEventListener('dom-ready', () => {
+            loaded++;
+            loadingText.textContent = loaded + ' / ' + total;
+            loadingProgressBar.style.width = (loaded / total * 100) + '%';
+            if (loaded >= total) resolve();
+          }, { once: true });
+        });
+
+        // Fallback: nach 30s trotzdem starten
+        setTimeout(resolve, 30000);
+      });
+    }
+
+    function showWebview(index) {
+      webviews.forEach((wv, i) => {
+        wv.classList.toggle('hidden-wv', i !== index);
+      });
+    }
 
     function initDots() {
       dotsContainer.innerHTML = '';
@@ -330,42 +414,38 @@
         dot.className = 'dot' + (i === currentIndex ? ' active' : '');
         dot.addEventListener('touchstart', (e) => {
           e.preventDefault();
-          if (i !== currentIndex) {
-            currentIndex = i;
-            loadSite(currentIndex);
-          }
+          if (i !== currentIndex) { currentIndex = i; switchToSite(i); }
         }, { passive: false });
         dot.addEventListener('click', (e) => {
           e.preventDefault();
-          if (i !== currentIndex) {
-            currentIndex = i;
-            loadSite(currentIndex);
-          }
+          if (i !== currentIndex) { currentIndex = i; switchToSite(i); }
         });
         dotsContainer.appendChild(dot);
       });
     }
 
     function updateDots() {
-      const dots = dotsContainer.querySelectorAll('.dot');
-      dots.forEach((dot, i) => {
+      dotsContainer.querySelectorAll('.dot').forEach((dot, i) => {
         dot.classList.toggle('active', i === currentIndex);
       });
     }
 
-    function loadSite(index) {
+    function switchToSite(index) {
       const site = config.sites[index];
       try { siteName.textContent = new URL(site.url).hostname; } catch { siteName.textContent = site.name; }
-      loadingScreen.classList.remove('hidden');
-      webview.src = site.url;
+      showWebview(index);
       updateDots();
       resetTimer();
-
     }
 
     function nextSite() {
       currentIndex = (currentIndex + 1) % config.sites.length;
-      loadSite(currentIndex);
+      switchToSite(currentIndex);
+    }
+
+    function prevSite() {
+      currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
+      switchToSite(currentIndex);
     }
 
     function resetTimer() {
@@ -387,7 +467,6 @@
       isPaused = true;
       pauseIndicator.classList.add('visible');
       timerProgress.classList.add('paused');
-
     }
 
     function resumeAfterScroll() {
@@ -407,194 +486,37 @@
     }
 
     // Navigation Buttons
-    function prevSite() {
-      currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
-      loadSite(currentIndex);
-    }
-
     document.getElementById('btnPrev').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); prevSite(); });
     document.getElementById('btnNext').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); nextSite(); });
     document.getElementById('btnPrev').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); prevSite(); }, { passive: false });
     document.getElementById('btnNext').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); nextSite(); }, { passive: false });
 
-    // Interaktionen im Webview erkennen + Cookie-Banner entfernen
-    webview.addEventListener('dom-ready', () => {
-      loadingScreen.classList.add('hidden');
-
-
-      // Cookie-Banner entfernen und Akzeptieren-Buttons klicken
-      webview.executeJavaScript(`try {
-        (function() {
-          // Bekannte Cookie-Banner Selektoren (CSS)
-          const bannerSelectors = [
-            '#cookie-banner', '#cookie-consent', '#cookiebanner', '#cookie-notice',
-            '#cookieNotice', '#cookie-popup', '#cookie-bar', '#cookie-law',
-            '.cookie-banner', '.cookie-consent', '.cookiebanner', '.cookie-notice',
-            '.cookie-popup', '.cookie-bar', '.cookie-overlay', '.cookie-modal',
-            '.cc-banner', '.cc-window', '.cc-overlay',
-            '.gdpr-banner', '.gdpr-consent', '.gdpr-popup',
-            '#gdpr-banner', '#gdpr-consent',
-            '.consent-banner', '.consent-popup', '.consent-modal',
-            '#consent-banner', '#consent-popup',
-            '#CybotCookiebotDialog', '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
-            '.cky-consent-container', '#cky-consent',
-            '#onetrust-banner-sdk', '#onetrust-consent-sdk',
-            '.otFlat', '#ot-sdk-btn-floating',
-            '#usercentrics-root',
-            '.sp-message-container',
-            '#klaro', '.klaro',
-            '[id*="cookie" i][id*="banner" i]',
-            '[id*="cookie" i][id*="consent" i]',
-            '[class*="cookie" i][class*="banner" i]',
-            '[class*="cookie" i][class*="consent" i]',
-            '[aria-label*="cookie" i]',
-            '[aria-label*="consent" i]',
-          ];
-
-          // Bekannte Akzeptieren-Button Selektoren
-          const acceptSelectors = [
-            '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
-            '#CybotCookiebotDialogBodyButtonAccept',
-            '.cky-btn-accept', '#cky-btn-accept',
-            '#onetrust-accept-btn-handler',
-            '.cc-accept', '.cc-btn.cc-allow', '.cc-dismiss',
-            '[data-action="accept"]',
-            '[data-cookie-accept]',
-            '.consent-accept', '.accept-cookies', '.allow-cookies',
-            '#accept-cookies', '#acceptCookies',
-            'button[id*="accept" i]',
-            'button[class*="accept" i]',
-            'a[id*="accept" i]',
-            'a[class*="accept" i]',
-          ];
-
-          // Auch Buttons mit bestimmtem Text finden
-          const acceptTexts = [
-            'akzeptieren', 'alle akzeptieren', 'accept', 'accept all',
-            'alle cookies akzeptieren', 'allow all', 'allow cookies',
-            'zustimmen', 'alle zustimmen', 'einverstanden', 'ok',
-            'ich stimme zu', 'verstanden', 'alles klar',
-          ];
-
-          function clickAcceptButtons() {
-            // Erst bekannte Selektoren probieren
-            for (const sel of acceptSelectors) {
-              const btn = document.querySelector(sel);
-              if (btn) { btn.click(); return true; }
-            }
-            // Dann Buttons nach Text suchen
-            const buttons = document.querySelectorAll('button, a[role="button"], .btn, [type="submit"]');
-            for (const btn of buttons) {
-              const text = (btn.textContent || '').trim().toLowerCase();
-              if (acceptTexts.some(t => text === t || text.includes(t))) {
-                btn.click();
-                return true;
-              }
-            }
-            return false;
-          }
-
-          function removeBanners() {
-            for (const sel of bannerSelectors) {
-              document.querySelectorAll(sel).forEach(el => {
-                el.style.display = 'none';
-                el.remove();
-              });
-            }
-            // Overlay/Backdrop entfernen
-            document.querySelectorAll('[class*="overlay" i]').forEach(el => {
-              const style = window.getComputedStyle(el);
-              if (style.position === 'fixed' && parseFloat(style.zIndex) > 999) {
-                el.remove();
-              }
-            });
-            // Body-Scroll wiederherstellen
-            document.body.style.overflow = '';
-            document.documentElement.style.overflow = '';
-          }
-
-          // Mehrfach versuchen (manche Banner laden verzoegert)
-          function killCookies() {
-            clickAcceptButtons();
-            setTimeout(() => { clickAcceptButtons(); removeBanners(); }, 500);
-            setTimeout(() => { clickAcceptButtons(); removeBanners(); }, 1500);
-            setTimeout(() => { clickAcceptButtons(); removeBanners(); }, 3000);
-          }
-
-          killCookies();
-
-          // MutationObserver fuer dynamisch geladene Banner
-          const observer = new MutationObserver(() => {
-            clickAcceptButtons();
-            removeBanners();
-          });
-          observer.observe(document.body, { childList: true, subtree: true });
-
-          // Observer nach 10 Sekunden stoppen (Performance)
-          setTimeout(() => observer.disconnect(), 10000);
-        })();
-      } catch(e) {}
-      `).catch(function(){});
-
-      // Scrollbar sichtbar + Animationen/Videos deaktivieren fuer Performance
-      try { webview.insertCSS('::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}html,body{overflow-y:auto!important}*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;scroll-behavior:auto!important}video,iframe[src*="youtube"],iframe[src*="vimeo"]{display:none!important}'); } catch(e) {}
-    });
-
-    // Scroll-Simulation laeuft jetzt ueber webview-preload.js
-
-    // IPC Messages vom Webview empfangen
-    webview.addEventListener('console-message', (e) => {
-      if (e.message === 'KIOSK:interaction') onInteraction();
-      if (e.message.startsWith('KIOSK:')) console.log('[webview] ' + e.message);
-    });
-
-    // Scroll-Erkennung per Polling der Webview-Scrollposition
-    let lastScrollY = -1;
-    let scrollPollInterval = null;
-
-    function startScrollPolling() {
-      if (scrollPollInterval) return;
-      scrollPollInterval = setInterval(async () => {
-        try {
-          const y = await webview.executeJavaScript('window.scrollY');
-          if (lastScrollY !== -1 && y !== lastScrollY) {
-            onInteraction();
-          }
-          lastScrollY = y;
-        } catch (e) {}
-      }, 150);
-    }
-
-    webview.addEventListener('dom-ready', () => {
-      lastScrollY = -1;
-      startScrollPolling();
-    });
-
-    // Timer-Loop (jede 0.5 Sekunden)
+    // Timer-Loop
     function startTimerLoop() {
       if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(() => {
         if (!isPaused && config) {
           timeRemaining -= 0.5;
           updateTimerDisplay();
-          if (timeRemaining <= 0) {
-            nextSite();
-          }
+          if (timeRemaining <= 0) nextSite();
         }
       }, 500);
     }
 
     // Config empfangen und starten
-    window.kiosk.onConfig((cfg) => {
+    window.kiosk.onConfig(async (cfg) => {
       config = cfg;
       if (config.sites.length === 0) {
         siteName.textContent = 'Keine Seiten konfiguriert';
         return;
       }
       initDots();
-      loadSite(0);
+      await preloadAllSites();
+      loadingScreen.classList.add('hidden');
+      switchToSite(0);
       startTimerLoop();
     });
+
     // ── On-Screen Keyboard ──────────────────────────────────────────
     const keyboard = document.getElementById('keyboard');
     let kbShift = false;
@@ -614,6 +536,10 @@
       'y':'Y','x':'X','c':'C','v':'V','b':'B','n':'N','m':'M',',':';','.':':'
     };
 
+    function getActiveWebview() {
+      return webviews[currentIndex];
+    }
+
     function buildKeyboard() {
       function makeKey(label, action, extraClass = '') {
         const btn = document.createElement('button');
@@ -627,26 +553,21 @@
         return makeKey(ch, () => typeChar(ch));
       }
 
-      // Num row
       const numRow = document.getElementById('kb-row-num');
       layouts.num.forEach(ch => numRow.appendChild(charKey(ch)));
       numRow.appendChild(makeKey('⌫', () => sendBackspace(), 'action'));
 
-      // Row 1
       const r1 = document.getElementById('kb-row-1');
       layouts.row1.forEach(ch => r1.appendChild(charKey(ch)));
 
-      // Row 2
       const r2 = document.getElementById('kb-row-2');
       layouts.row2.forEach(ch => r2.appendChild(charKey(ch)));
 
-      // Row 3 (with Shift)
       const r3 = document.getElementById('kb-row-3');
       r3.appendChild(makeKey('⇧', toggleShift, 'action wide' + (kbShift ? ' shift-active' : '')));
       layouts.row3.forEach(ch => r3.appendChild(charKey(ch)));
       r3.appendChild(makeKey('⇧', toggleShift, 'action wide' + (kbShift ? ' shift-active' : '')));
 
-      // Row 4 (space, close)
       const r4 = document.getElementById('kb-row-4');
       r4.appendChild(makeKey('@', () => typeChar('@'), 'wide'));
       r4.appendChild(makeKey('SPACE', () => typeChar(' '), 'space'));
@@ -667,8 +588,10 @@
     }
 
     function typeChar(ch) {
+      const wv = getActiveWebview();
+      if (!wv) return;
       const char = (kbShift || kbCaps) ? (shiftMap[ch] || ch.toUpperCase()) : ch;
-      webview.executeJavaScript(`
+      wv.executeJavaScript(`
         (function() {
           const el = document.activeElement;
           if (!el) return;
@@ -685,12 +608,14 @@
           const pos = start + 1;
           if (el.setSelectionRange) el.setSelectionRange(pos, pos);
         })();
-      `);
+      `).catch(function(){});
       if (kbShift) { kbShift = false; refreshKeyboard(); }
     }
 
     function sendBackspace() {
-      webview.executeJavaScript(`
+      const wv = getActiveWebview();
+      if (!wv) return;
+      wv.executeJavaScript(`
         (function() {
           const el = document.activeElement;
           if (!el) return;
@@ -707,11 +632,13 @@
           const pos = start !== end ? start : Math.max(0, start - 1);
           if (el.setSelectionRange) el.setSelectionRange(pos, pos);
         })();
-      `);
+      `).catch(function(){});
     }
 
     function sendEnter() {
-      webview.executeJavaScript(`
+      const wv = getActiveWebview();
+      if (!wv) return;
+      wv.executeJavaScript(`
         (function() {
           const el = document.activeElement;
           if (!el) return;
@@ -719,13 +646,12 @@
           el.dispatchEvent(new KeyboardEvent('keyup',   { key: 'Enter', code: 'Enter', bubbles: true }));
           if (el.form) el.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
         })();
-      `);
+      `).catch(function(){});
       hideKeyboard();
     }
 
     function showKeyboard() {
       keyboard.classList.add('visible');
-      // Webview nach oben schieben damit das Input-Feld nicht verdeckt wird
       const kbHeight = keyboard.offsetHeight || 220;
       webviewContainer.style.height = `calc(100vh - 44px - ${kbHeight}px)`;
     }
@@ -733,16 +659,18 @@
     function hideKeyboard() {
       keyboard.classList.remove('visible');
       webviewContainer.style.height = '';
-      webview.executeJavaScript(`if (document.activeElement) document.activeElement.blur();`);
+      const wv = getActiveWebview();
+      if (wv) wv.executeJavaScript('if (document.activeElement) document.activeElement.blur();').catch(function(){});
     }
 
     // Input-Fokus per Polling erkennen
     let inputFocused = false;
 
     setInterval(async () => {
-      if (!webview.src || webview.src === 'about:blank') return;
+      const wv = getActiveWebview();
+      if (!wv || !wv.src || wv.src === 'about:blank') return;
       try {
-        const tag = await webview.executeJavaScript(
+        const tag = await wv.executeJavaScript(
           `(function(){ const el = document.activeElement; if (!el) return ''; return el.tagName + '|' + el.type; })()`
         );
         const isInput = tag && (
