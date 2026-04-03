@@ -64,42 +64,6 @@
       box-shadow: 0 0 6px rgba(200, 255, 0, 0.4);
     }
 
-    #bottomBar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 44px;
-      background: #0a0a0a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      z-index: 1000;
-      border-top: 1px solid rgba(200, 255, 0, 0.15);
-    }
-
-    .nav-btn {
-      background: none;
-      border: 1px solid rgba(200, 255, 0, 0.2);
-      color: rgba(200, 255, 0, 0.5);
-      font-size: 20px;
-      width: 120px;
-      height: 34px;
-      border-radius: 8px;
-      cursor: pointer;
-      touch-action: manipulation;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-    }
-
-    .nav-btn:active {
-      background: #c8ff00;
-      color: #0a0a0a;
-    }
-
     #siteName {
       font-family: 'Space Mono', monospace;
       font-weight: 400;
@@ -154,6 +118,42 @@
 
     #pauseIndicator.visible {
       display: inline;
+    }
+
+    #bottomBar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 44px;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 1000;
+      border-top: 1px solid rgba(200, 255, 0, 0.15);
+    }
+
+    .nav-btn {
+      background: none;
+      border: 1px solid rgba(200, 255, 0, 0.2);
+      color: rgba(200, 255, 0, 0.5);
+      font-size: 20px;
+      width: 120px;
+      height: 34px;
+      border-radius: 8px;
+      cursor: pointer;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .nav-btn:active {
+      background: #c8ff00;
+      color: #0a0a0a;
     }
 
     #webviewContainer {
@@ -283,7 +283,6 @@
     <button id="btnNext" class="nav-btn">&#x276F;</button>
   </div>
 
-
   <div id="loadingScreen">
     <div class="spinner"></div>
     <div>Lade Webseite...</div>
@@ -406,21 +405,141 @@
       resumeAfterScroll();
     }
 
-    // Navigation Buttons
     function prevSite() {
       currentIndex = (currentIndex - 1 + config.sites.length) % config.sites.length;
       loadSite(currentIndex);
     }
 
+    // Bottom-Bar Navigation
     document.getElementById('btnPrev').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); prevSite(); });
     document.getElementById('btnNext').addEventListener('click', (e) => { e.preventDefault(); onInteraction(); nextSite(); });
     document.getElementById('btnPrev').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); prevSite(); }, { passive: false });
     document.getElementById('btnNext').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); nextSite(); }, { passive: false });
 
-    // Cookie-Banner + Scrollbar + Scroll-Simulation laufen ueber webview-preload.js
+    // Interaktionen im Webview erkennen + Cookie-Banner entfernen
     webview.addEventListener('dom-ready', () => {
       loadingScreen.classList.add('hidden');
+
+
+      // Cookie-Banner entfernen und Akzeptieren-Buttons klicken
+      webview.executeJavaScript(`try {
+        (function() {
+          // Bekannte Cookie-Banner Selektoren (CSS)
+          const bannerSelectors = [
+            '#cookie-banner', '#cookie-consent', '#cookiebanner', '#cookie-notice',
+            '#cookieNotice', '#cookie-popup', '#cookie-bar', '#cookie-law',
+            '.cookie-banner', '.cookie-consent', '.cookiebanner', '.cookie-notice',
+            '.cookie-popup', '.cookie-bar', '.cookie-overlay', '.cookie-modal',
+            '.cc-banner', '.cc-window', '.cc-overlay',
+            '.gdpr-banner', '.gdpr-consent', '.gdpr-popup',
+            '#gdpr-banner', '#gdpr-consent',
+            '.consent-banner', '.consent-popup', '.consent-modal',
+            '#consent-banner', '#consent-popup',
+            '#CybotCookiebotDialog', '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
+            '.cky-consent-container', '#cky-consent',
+            '#onetrust-banner-sdk', '#onetrust-consent-sdk',
+            '.otFlat', '#ot-sdk-btn-floating',
+            '#usercentrics-root',
+            '.sp-message-container',
+            '#klaro', '.klaro',
+            '[id*="cookie" i][id*="banner" i]',
+            '[id*="cookie" i][id*="consent" i]',
+            '[class*="cookie" i][class*="banner" i]',
+            '[class*="cookie" i][class*="consent" i]',
+            '[aria-label*="cookie" i]',
+            '[aria-label*="consent" i]',
+          ];
+
+          // Bekannte Akzeptieren-Button Selektoren
+          const acceptSelectors = [
+            '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
+            '#CybotCookiebotDialogBodyButtonAccept',
+            '.cky-btn-accept', '#cky-btn-accept',
+            '#onetrust-accept-btn-handler',
+            '.cc-accept', '.cc-btn.cc-allow', '.cc-dismiss',
+            '[data-action="accept"]',
+            '[data-cookie-accept]',
+            '.consent-accept', '.accept-cookies', '.allow-cookies',
+            '#accept-cookies', '#acceptCookies',
+            'button[id*="accept" i]',
+            'button[class*="accept" i]',
+            'a[id*="accept" i]',
+            'a[class*="accept" i]',
+          ];
+
+          // Auch Buttons mit bestimmtem Text finden
+          const acceptTexts = [
+            'akzeptieren', 'alle akzeptieren', 'accept', 'accept all',
+            'alle cookies akzeptieren', 'allow all', 'allow cookies',
+            'zustimmen', 'alle zustimmen', 'einverstanden', 'ok',
+            'ich stimme zu', 'verstanden', 'alles klar',
+          ];
+
+          function clickAcceptButtons() {
+            // Erst bekannte Selektoren probieren
+            for (const sel of acceptSelectors) {
+              const btn = document.querySelector(sel);
+              if (btn) { btn.click(); return true; }
+            }
+            // Dann Buttons nach Text suchen
+            const buttons = document.querySelectorAll('button, a[role="button"], .btn, [type="submit"]');
+            for (const btn of buttons) {
+              const text = (btn.textContent || '').trim().toLowerCase();
+              if (acceptTexts.some(t => text === t || text.includes(t))) {
+                btn.click();
+                return true;
+              }
+            }
+            return false;
+          }
+
+          function removeBanners() {
+            for (const sel of bannerSelectors) {
+              document.querySelectorAll(sel).forEach(el => {
+                el.style.display = 'none';
+                el.remove();
+              });
+            }
+            // Overlay/Backdrop entfernen
+            document.querySelectorAll('[class*="overlay" i]').forEach(el => {
+              const style = window.getComputedStyle(el);
+              if (style.position === 'fixed' && parseFloat(style.zIndex) > 999) {
+                el.remove();
+              }
+            });
+            // Body-Scroll wiederherstellen
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+          }
+
+          // Mehrfach versuchen (manche Banner laden verzoegert)
+          function killCookies() {
+            clickAcceptButtons();
+            setTimeout(() => { clickAcceptButtons(); removeBanners(); }, 500);
+            setTimeout(() => { clickAcceptButtons(); removeBanners(); }, 1500);
+            setTimeout(() => { clickAcceptButtons(); removeBanners(); }, 3000);
+          }
+
+          killCookies();
+
+          // MutationObserver fuer dynamisch geladene Banner
+          const observer = new MutationObserver(() => {
+            clickAcceptButtons();
+            removeBanners();
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+
+          // Observer nach 10 Sekunden stoppen (Performance)
+          setTimeout(() => observer.disconnect(), 10000);
+        })();
+      } catch(e) {}
+      `).catch(function(){});
+
+      // Scrollbar sichtbar und touch-freundlich machen
+      try { webview.insertCSS('::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}html,body{overflow-y:auto!important}'); } catch(e) {}
     });
+
+    // Scroll-Simulation laeuft jetzt ueber webview-preload.js
 
     // IPC Messages vom Webview empfangen
     webview.addEventListener('console-message', (e) => {
