@@ -628,6 +628,13 @@
             isDown = false;
           }
 
+          // DEBUG: Welche Events kommen an?
+          ['touchstart','touchmove','touchend','mousedown','mousemove','mouseup','pointerdown','pointermove','pointerup'].forEach(evt => {
+            document.addEventListener(evt, (e) => {
+              console.log('EVENT: ' + evt + ' y=' + (e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || '?'));
+            }, { capture: true });
+          });
+
           // Touch-Events
           document.addEventListener('touchstart', (e) => {
             onPointerDown(e.touches[0].clientY);
@@ -645,13 +652,22 @@
             onPointerMove(e.clientY, e);
           }, { capture: true });
           document.addEventListener('mouseup', onPointerUp, { capture: true });
+
+          // Pointer-Events (Fallback)
+          document.addEventListener('pointerdown', (e) => {
+            onPointerDown(e.clientY);
+          }, { capture: true });
+          document.addEventListener('pointermove', (e) => {
+            if (isDown) onPointerMove(e.clientY, e);
+          }, { capture: true });
+          document.addEventListener('pointerup', onPointerUp, { capture: true });
         })();
       `);
     });
 
     // IPC Messages vom Webview empfangen
     webview.addEventListener('console-message', (e) => {
-      // Fallback: nicht verwendet
+      if (e.message.startsWith('EVENT:')) console.log('[webview] ' + e.message);
     });
 
     webview.addEventListener('ipc-message', (e) => {
