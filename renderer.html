@@ -311,6 +311,9 @@
 
   <script>
     const webview = document.getElementById('webview');
+    // Preload-Script fuer Scroll-Simulation setzen (braucht absoluten Pfad)
+    const path = require('path');
+    webview.setAttribute('preload', 'file://' + path.join(__dirname, 'webview-preload.js'));
     const webviewContainer = document.getElementById('webviewContainer');
     const siteName = document.getElementById('siteName');
     const timerProgress = document.getElementById('timerProgress');
@@ -564,28 +567,7 @@
       try { webview.insertCSS('::-webkit-scrollbar{display:none!important}html,body{scrollbar-width:none!important}'); } catch(e) {}
     });
 
-    // Scroll-Simulation in eigenem Handler (unabhaengig vom Cookie-Code)
-    webview.addEventListener('dom-ready', () => {
-      webview.executeJavaScript(`
-        try {
-          var startY=null,lastY=null,scrolling=false,isDown=false;
-          function _d(y){startY=y;lastY=y;scrolling=false;isDown=true;console.log('KIOSK:interaction');}
-          function _m(y,e){if(!isDown||lastY===null)return;var dy=lastY-y;if(!scrolling&&Math.abs(y-startY)>5)scrolling=true;if(scrolling){window.scrollBy(0,dy);try{e.preventDefault();}catch(x){}console.log('KIOSK:interaction');}lastY=y;}
-          function _u(){startY=null;lastY=null;scrolling=false;isDown=false;}
-          document.addEventListener('pointerdown',function(e){_d(e.clientY);},true);
-          document.addEventListener('pointermove',function(e){if(isDown)_m(e.clientY,e);},true);
-          document.addEventListener('pointerup',_u,true);
-          document.addEventListener('mousedown',function(e){_d(e.clientY);},true);
-          document.addEventListener('mousemove',function(e){_m(e.clientY,e);},true);
-          document.addEventListener('mouseup',_u,true);
-          document.addEventListener('touchstart',function(e){_d(e.touches[0].clientY);},true);
-          document.addEventListener('touchmove',function(e){_m(e.touches[0].clientY,e);},true);
-          document.addEventListener('touchend',_u,true);
-          document.addEventListener('selectstart',function(e){var t=(e.target.tagName||'').toLowerCase();if(t!=='input'&&t!=='textarea')e.preventDefault();});
-          console.log('KIOSK:scroll-sim-loaded');
-        } catch(ex) { console.log('KIOSK:error:'+ex.message); }
-      `).catch(function(){});
-    });
+    // Scroll-Simulation laeuft jetzt ueber webview-preload.js
 
     // IPC Messages vom Webview empfangen
     webview.addEventListener('console-message', (e) => {
