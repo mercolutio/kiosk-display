@@ -4,7 +4,8 @@
   "sites": [
     {
       "url": "https://velvetgreen-dienstleistungen.de",
-      "name": "Velvetgreen Dienstleistungen"
+      "name": "Velvetgreen Dienstleistungen",
+      "duration": 20
     },
     {
       "url": "https://immobilien-doll.de",
@@ -16,7 +17,8 @@
     },
     {
       "url": "https://rexfortis.de",
-      "name": "Rexfortis"
+      "name": "Rexfortis",
+      "duration": 30
     }
   ]
 }

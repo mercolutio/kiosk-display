@@ -367,8 +367,13 @@
       loadSite(currentIndex);
     }
 
+    function getSiteDuration() {
+      const site = config.sites[currentIndex];
+      return site.duration || config.rotationInterval;
+    }
+
     function resetTimer() {
-      timeRemaining = config.rotationInterval;
+      timeRemaining = getSiteDuration();
       isPaused = false;
       pauseIndicator.classList.remove('visible');
       timerProgress.classList.remove('paused');
@@ -376,7 +381,8 @@
     }
 
     function updateTimerDisplay() {
-      const pct = (timeRemaining / config.rotationInterval) * 100;
+      const duration = getSiteDuration();
+      const pct = (timeRemaining / duration) * 100;
       timerProgress.style.width = pct + '%';
       timerText.textContent = Math.ceil(timeRemaining) + 's';
     }
