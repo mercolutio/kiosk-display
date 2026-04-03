@@ -447,7 +447,7 @@
 
 
       // Cookie-Banner entfernen und Akzeptieren-Buttons klicken
-      webview.executeJavaScript(`
+      webview.executeJavaScript(`try {
         (function() {
           // Bekannte Cookie-Banner Selektoren (CSS)
           const bannerSelectors = [
@@ -557,65 +557,40 @@
           // Observer nach 10 Sekunden stoppen (Performance)
           setTimeout(() => observer.disconnect(), 10000);
         })();
-      `);
+      } catch(e) {}
+      `).catch(function(){});
 
-      // Scrollbar ausblenden + Text-Selektion verhindern
-      webview.insertCSS(`
-        ::-webkit-scrollbar { display: none !important; }
-        html, body {
-          scrollbar-width: none !important;
-          -webkit-user-select: none !important;
-          user-select: none !important;
-          -webkit-touch-callout: none !important;
-        }
-        input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
-      `);
+      // Scrollbar ausblenden
+      try { webview.insertCSS('::-webkit-scrollbar{display:none!important}html,body{scrollbar-width:none!important}'); } catch(e) {}
+    });
 
-      // Scroll-Simulation + Interaktion-Erkennung
-      // (kein require('electron') — nutzt console.log fuer IPC)
+    // Scroll-Simulation in eigenem Handler (unabhaengig vom Cookie-Code)
+    webview.addEventListener('dom-ready', () => {
       webview.executeJavaScript(`
-        (function() {
-          document.addEventListener('selectstart', function(e) {
-            var tag = (e.target.tagName || '').toLowerCase();
-            if (tag !== 'input' && tag !== 'textarea') e.preventDefault();
-          });
-          document.addEventListener('dragstart', function(e) { e.preventDefault(); });
-
-          var startY = null, lastY = null, scrolling = false, isDown = false;
-
-          function down(y) { startY = y; lastY = y; scrolling = false; isDown = true; console.log('KIOSK:interaction'); }
-          function move(y, e) {
-            if (!isDown || lastY === null) return;
-            var dy = lastY - y;
-            if (!scrolling && Math.abs(y - startY) > 5) scrolling = true;
-            if (scrolling) {
-              window.scrollBy(0, dy);
-              if (e.preventDefault) e.preventDefault();
-              console.log('KIOSK:interaction');
-            }
-            lastY = y;
-          }
-          function up() { startY = null; lastY = null; scrolling = false; isDown = false; }
-
-          document.addEventListener('pointerdown', function(e) { down(e.clientY); }, true);
-          document.addEventListener('pointermove', function(e) { if (isDown) move(e.clientY, e); }, true);
-          document.addEventListener('pointerup', up, true);
-          document.addEventListener('mousedown', function(e) { down(e.clientY); }, true);
-          document.addEventListener('mousemove', function(e) { move(e.clientY, e); }, true);
-          document.addEventListener('mouseup', up, true);
-          document.addEventListener('touchstart', function(e) { down(e.touches[0].clientY); }, {capture:true, passive:true});
-          document.addEventListener('touchmove', function(e) { move(e.touches[0].clientY, e); }, {capture:true, passive:false});
-          document.addEventListener('touchend', up, {capture:true, passive:true});
-
+        try {
+          var startY=null,lastY=null,scrolling=false,isDown=false;
+          function _d(y){startY=y;lastY=y;scrolling=false;isDown=true;console.log('KIOSK:interaction');}
+          function _m(y,e){if(!isDown||lastY===null)return;var dy=lastY-y;if(!scrolling&&Math.abs(y-startY)>5)scrolling=true;if(scrolling){window.scrollBy(0,dy);try{e.preventDefault();}catch(x){}console.log('KIOSK:interaction');}lastY=y;}
+          function _u(){startY=null;lastY=null;scrolling=false;isDown=false;}
+          document.addEventListener('pointerdown',function(e){_d(e.clientY);},true);
+          document.addEventListener('pointermove',function(e){if(isDown)_m(e.clientY,e);},true);
+          document.addEventListener('pointerup',_u,true);
+          document.addEventListener('mousedown',function(e){_d(e.clientY);},true);
+          document.addEventListener('mousemove',function(e){_m(e.clientY,e);},true);
+          document.addEventListener('mouseup',_u,true);
+          document.addEventListener('touchstart',function(e){_d(e.touches[0].clientY);},true);
+          document.addEventListener('touchmove',function(e){_m(e.touches[0].clientY,e);},true);
+          document.addEventListener('touchend',_u,true);
+          document.addEventListener('selectstart',function(e){var t=(e.target.tagName||'').toLowerCase();if(t!=='input'&&t!=='textarea')e.preventDefault();});
           console.log('KIOSK:scroll-sim-loaded');
-        })();
-      `);
+        } catch(ex) { console.log('KIOSK:error:'+ex.message); }
+      `).catch(function(){});
     });
 
     // IPC Messages vom Webview empfangen
     webview.addEventListener('console-message', (e) => {
       if (e.message === 'KIOSK:interaction') onInteraction();
-      if (e.message === 'KIOSK:scroll-sim-loaded') console.log('Scroll-Simulation geladen');
+      if (e.message.startsWith('KIOSK:')) console.log('[webview] ' + e.message);
     });
 
     // Scroll-Erkennung per Polling der Webview-Scrollposition
