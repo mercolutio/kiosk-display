@@ -2,6 +2,11 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// Touch-Events auf Raspberry Pi / Wayland aktivieren
+app.commandLine.appendSwitch('touch-events', 'enabled');
+app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform');
+app.commandLine.appendSwitch('enable-touch-drag-drop');
+
 let mainWindow;
 
 function loadConfig() {
