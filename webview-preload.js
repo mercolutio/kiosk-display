@@ -1,4 +1,4 @@
-// Cookie-Banner-Entfernung + Scrollbar-Styling + Interaktions-Erkennung
+// Cookie-Banner-Entfernung + Scrollbar-Styling + Scroll-Simulation
 // Dieses Script wird als Preload in jeder Webview geladen
 
 (function() {
@@ -12,9 +12,6 @@
   }
 
   document.addEventListener('scroll', notify, true);
-  document.addEventListener('pointerdown', notify, true);
-  document.addEventListener('mousedown', notify, true);
-  document.addEventListener('touchstart', notify, true);
   document.addEventListener('keydown', notify, true);
 
   // Text-Selektion verhindern (außer Eingabefelder)
@@ -22,6 +19,38 @@
     var t = (e.target.tagName || '').toLowerCase();
     if (t !== 'input' && t !== 'textarea') e.preventDefault();
   });
+
+  // ── Scroll-Simulation (ohne preventDefault, arbeitet MIT nativem Scrolling) ──
+  var startY = null, lastY = null, scrolling = false, isDown = false;
+
+  function down(y) {
+    startY = y; lastY = y; scrolling = false; isDown = true;
+    notify();
+  }
+
+  function move(y) {
+    if (!isDown || lastY === null) return;
+    var dy = lastY - y;
+    if (!scrolling && Math.abs(y - startY) > 5) scrolling = true;
+    if (scrolling) {
+      window.scrollBy(0, dy);
+    }
+    lastY = y;
+  }
+
+  function up() {
+    startY = null; lastY = null; scrolling = false; isDown = false;
+  }
+
+  document.addEventListener('pointerdown', function(e) { down(e.clientY); }, true);
+  document.addEventListener('pointermove', function(e) { if (isDown) move(e.clientY); }, true);
+  document.addEventListener('pointerup', up, true);
+  document.addEventListener('mousedown', function(e) { down(e.clientY); }, true);
+  document.addEventListener('mousemove', function(e) { if (isDown) move(e.clientY); }, true);
+  document.addEventListener('mouseup', up, true);
+  document.addEventListener('touchstart', function(e) { down(e.touches[0].clientY); }, true);
+  document.addEventListener('touchmove', function(e) { if (isDown) move(e.touches[0].clientY); }, true);
+  document.addEventListener('touchend', up, true);
 
   // ── Scrollbar-Styling ──
   var style = document.createElement('style');
