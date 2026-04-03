@@ -571,8 +571,8 @@
         input, textarea, [contenteditable] { -webkit-user-select: text !important; user-select: text !important; }
       `);
 
-      // Interaktion-Erkennung + Touch-Scrolling simulieren
-      // (Der USB-Touchscreen hat kein natives Scroll — wir simulieren es per JS)
+      // Interaktion-Erkennung + Scroll-Simulation
+      // (Der USB-Touchscreen hat kein natives Scroll und sendet ggf. Maus-Events)
       webview.executeJavaScript(`
         (function() {
           const ipc = require('electron').ipcRenderer;
@@ -585,7 +585,6 @@
           }
           document.addEventListener('scroll', notify, { passive: true, capture: true });
           document.addEventListener('wheel', notify, { passive: true });
-          document.addEventListener('mousedown', notify);
           document.addEventListener('keydown', notify);
 
           // Text-Selektion verhindern (außer in Eingabefeldern)
@@ -597,39 +596,55 @@
           });
           document.addEventListener('dragstart', (e) => e.preventDefault());
 
-          // Touch-Scrolling simulieren
-          let tStartY = null, tLastY = null, tScrolling = false;
-          document.addEventListener('touchstart', (e) => {
-            const t = e.touches[0];
-            tStartY = t.clientY;
-            tLastY = t.clientY;
-            tScrolling = false;
+          // Scroll-Simulation (funktioniert mit Touch UND Maus-Events)
+          let startY = null, lastY = null, scrolling = false, isDown = false;
+
+          function onPointerDown(y) {
+            startY = y;
+            lastY = y;
+            scrolling = false;
+            isDown = true;
             notify();
-          }, { passive: true, capture: true });
+          }
 
-          document.addEventListener('touchmove', (e) => {
-            if (tLastY === null) return;
-            const t = e.touches[0];
-            const dy = tLastY - t.clientY;
-
-            // Nach 5px Bewegung: Scrolling starten
-            if (!tScrolling && Math.abs(t.clientY - tStartY) > 5) {
-              tScrolling = true;
+          function onPointerMove(y, e) {
+            if (!isDown || lastY === null) return;
+            const dy = lastY - y;
+            if (!scrolling && Math.abs(y - startY) > 5) {
+              scrolling = true;
             }
-
-            if (tScrolling) {
+            if (scrolling) {
               window.scrollBy(0, dy);
-              e.preventDefault();
+              if (e && e.preventDefault) e.preventDefault();
               notify();
             }
-            tLastY = t.clientY;
-          }, { passive: false, capture: true });
+            lastY = y;
+          }
 
-          document.addEventListener('touchend', () => {
-            tStartY = null;
-            tLastY = null;
-            tScrolling = false;
+          function onPointerUp() {
+            startY = null;
+            lastY = null;
+            scrolling = false;
+            isDown = false;
+          }
+
+          // Touch-Events
+          document.addEventListener('touchstart', (e) => {
+            onPointerDown(e.touches[0].clientY);
           }, { passive: true, capture: true });
+          document.addEventListener('touchmove', (e) => {
+            onPointerMove(e.touches[0].clientY, e);
+          }, { passive: false, capture: true });
+          document.addEventListener('touchend', onPointerUp, { passive: true, capture: true });
+
+          // Maus-Events (manche Touchscreens senden nur diese)
+          document.addEventListener('mousedown', (e) => {
+            onPointerDown(e.clientY);
+          }, { capture: true });
+          document.addEventListener('mousemove', (e) => {
+            onPointerMove(e.clientY, e);
+          }, { capture: true });
+          document.addEventListener('mouseup', onPointerUp, { capture: true });
         })();
       `);
     });
