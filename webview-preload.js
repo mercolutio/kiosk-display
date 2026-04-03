@@ -1,39 +1,20 @@
-// Cookie-Banner-Entfernung + Scrollbar-Styling + Scroll-Simulation
-// Dieses Script wird als Preload in jeder Webview geladen
-
+// Scroll-Simulation für Touchscreen ohne natives Scroll
 (function() {
-  // ── Interaktions-Erkennung (pausiert den Timer) ──
-  var lastNotify = 0;
-  function notify() {
-    var now = Date.now();
-    if (now - lastNotify < 300) return;
-    lastNotify = now;
-    console.log('KIOSK:interaction');
-  }
-
-  document.addEventListener('scroll', notify, true);
-  document.addEventListener('keydown', notify, true);
-
-  // Text-Selektion verhindern (außer Eingabefelder)
-  document.addEventListener('selectstart', function(e) {
-    var t = (e.target.tagName || '').toLowerCase();
-    if (t !== 'input' && t !== 'textarea') e.preventDefault();
-  });
-
-  // ── Scroll-Simulation (ohne preventDefault, arbeitet MIT nativem Scrolling) ──
   var startY = null, lastY = null, scrolling = false, isDown = false;
 
   function down(y) {
     startY = y; lastY = y; scrolling = false; isDown = true;
-    notify();
+    console.log('KIOSK:interaction');
   }
 
-  function move(y) {
+  function move(y, e) {
     if (!isDown || lastY === null) return;
     var dy = lastY - y;
     if (!scrolling && Math.abs(y - startY) > 5) scrolling = true;
     if (scrolling) {
       window.scrollBy(0, dy);
+      try { e.preventDefault(); } catch(x) {}
+      console.log('KIOSK:interaction');
     }
     lastY = y;
   }
@@ -42,24 +23,30 @@
     startY = null; lastY = null; scrolling = false; isDown = false;
   }
 
+  // Pointer Events
   document.addEventListener('pointerdown', function(e) { down(e.clientY); }, true);
-  document.addEventListener('pointermove', function(e) { if (isDown) move(e.clientY); }, true);
+  document.addEventListener('pointermove', function(e) { if (isDown) move(e.clientY, e); }, true);
   document.addEventListener('pointerup', up, true);
+
+  // Mouse Events
   document.addEventListener('mousedown', function(e) { down(e.clientY); }, true);
-  document.addEventListener('mousemove', function(e) { if (isDown) move(e.clientY); }, true);
+  document.addEventListener('mousemove', function(e) { move(e.clientY, e); }, true);
   document.addEventListener('mouseup', up, true);
+
+  // Touch Events
   document.addEventListener('touchstart', function(e) { down(e.touches[0].clientY); }, true);
-  document.addEventListener('touchmove', function(e) { if (isDown) move(e.touches[0].clientY); }, true);
+  document.addEventListener('touchmove', function(e) { move(e.touches[0].clientY, e); }, true);
   document.addEventListener('touchend', up, true);
 
-  // ── Scrollbar-Styling ──
-  var style = document.createElement('style');
-  style.textContent = '::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}html,body{overflow-y:auto!important}';
-  document.addEventListener('DOMContentLoaded', function() {
-    document.head.appendChild(style);
+  // Text-Selektion verhindern
+  document.addEventListener('selectstart', function(e) {
+    var t = (e.target.tagName || '').toLowerCase();
+    if (t !== 'input' && t !== 'textarea') e.preventDefault();
   });
 
-  // ── Cookie-Banner entfernen ──
+  console.log('KIOSK:scroll-sim-loaded');
+
+  // ── Cookie-Banner entfernen (nach DOMContentLoaded) ──
   var bannerSelectors = [
     '#cookie-banner', '#cookie-consent', '#cookiebanner', '#cookie-notice',
     '#cookieNotice', '#cookie-popup', '#cookie-bar', '#cookie-law',
@@ -160,7 +147,10 @@
     });
     observer.observe(document.body, { childList: true, subtree: true });
     setTimeout(function() { observer.disconnect(); }, 10000);
-  });
 
-  console.log('KIOSK:preload-loaded');
+    // Scrollbar sichtbar machen (ohne overflow-y zu aendern)
+    var style = document.createElement('style');
+    style.textContent = '::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}';
+    document.head.appendChild(style);
+  });
 })();
