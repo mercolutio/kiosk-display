@@ -2,10 +2,14 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// Touch-Events auf Raspberry Pi / Wayland aktivieren
+// Raspberry Pi Performance + Touch
 app.commandLine.appendSwitch('touch-events', 'enabled');
 app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform');
 app.commandLine.appendSwitch('enable-touch-drag-drop');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 let mainWindow;
 

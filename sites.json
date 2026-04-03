@@ -1,5 +1,5 @@
 {
-  "rotationInterval": 5,
+  "rotationInterval": 15,
   "idleTimeout": 5,
   "sites": [
     {
