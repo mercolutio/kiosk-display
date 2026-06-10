@@ -1,0 +1,14 @@
+[Unit]
+Description=Kiosk Management Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/kiosk-agent.env
+ExecStart=/usr/bin/python3 %h/kiosk-display/platform/agent/kiosk-agent.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,21 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { verifyToken, SESSION_COOKIE } from '@/lib/auth';
+
+// Schuetzt alle Seiten ausser /login. Die Agent-API (/api/agent/*) ist per
+// Matcher ausgenommen und sichert sich selbst ueber das Geraete-Token.
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  if (pathname.startsWith('/login')) return NextResponse.next();
+
+  const token = req.cookies.get(SESSION_COOKIE)?.value;
+  if (await verifyToken(token)) return NextResponse.next();
+
+  const url = req.nextUrl.clone();
+  url.pathname = '/login';
+  return NextResponse.redirect(url);
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/agent).*)'],
+};
