@@ -48,6 +48,16 @@ ipcMain.handle('reload-config', () => {
   return loadConfig();
 });
 
+// Notausstieg: Strg+Shift+Q beendet den Kiosk — egal ob der Fokus auf der Seite
+// oder im Webview liegt. Damit sitzt man am Geraet nie ohne SSH fest.
+app.on('web-contents-created', (event, contents) => {
+  contents.on('before-input-event', (e, input) => {
+    if (input.control && input.shift && (input.key === 'Q' || input.key === 'q')) {
+      app.quit();
+    }
+  });
+});
+
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
