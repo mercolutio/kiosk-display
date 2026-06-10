@@ -27,6 +27,12 @@ import json
 import os
 import sys
 
+# WebKitGTK rendert auf dem Raspberry Pi (V3D-GPU unter Wayland) mit dem DMABUF-
+# Renderer teils korrupt (vertikale Streifen/Rauschen). Diesen Pfad standardmaessig
+# deaktivieren -> sauberes Bild. setdefault respektiert eine bereits gesetzte Variable
+# (z. B. WEBKIT_DISABLE_DMABUF_RENDERER=0), falls man ihn doch erzwingen will.
+os.environ.setdefault('WEBKIT_DISABLE_DMABUF_RENDERER', '1')
+
 import gi
 
 gi.require_version('Gtk', '3.0')
