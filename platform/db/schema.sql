@@ -1,0 +1,44 @@
+-- Schema der Kiosk-Verwaltungsplattform.
+-- Einmalig gegen die (Vercel-)Postgres-Datenbank ausfuehren.
+
+create extension if not exists pgcrypto;
+
+-- Ein Kiosk-Geraet (Raspberry Pi).
+create table if not exists devices (
+  id               uuid primary key default gen_random_uuid(),
+  name             text not null,
+  token            text not null unique,          -- Geheim-Token, mit dem sich der Agent meldet
+  rotation_interval int  not null default 15,     -- Fallback-Anzeigedauer (Sekunden)
+  idle_timeout     int  not null default 5,
+  screen_on_time   time,                           -- optionale Zeitsteuerung: an ab ...
+  screen_off_time  time,                           -- ... aus ab ...
+  last_seen_at     timestamptz,                    -- letzter Heartbeat (online/offline)
+  current_site     text,                           -- vom Agent gemeldete aktuelle Seite
+  agent_version    text,
+  created_at       timestamptz not null default now()
+);
+
+-- Geordnete Liste der Webseiten je Geraet.
+create table if not exists sites (
+  id          uuid primary key default gen_random_uuid(),
+  device_id   uuid not null references devices(id) on delete cascade,
+  name        text not null,
+  url         text not null,
+  duration    int,                                 -- optionale Anzeigedauer; NULL => rotation_interval
+  position    int  not null default 0,             -- Reihenfolge
+  enabled     boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+create index if not exists sites_device_pos on sites (device_id, position);
+
+-- Befehlswarteschlange je Geraet (vom Agent abgeholt und quittiert).
+create table if not exists commands (
+  id          uuid primary key default gen_random_uuid(),
+  device_id   uuid not null references devices(id) on delete cascade,
+  type        text not null check (type in ('restart_app', 'reboot', 'reload_config')),
+  status      text not null default 'pending' check (status in ('pending', 'done', 'failed')),
+  result      text,
+  created_at  timestamptz not null default now(),
+  executed_at timestamptz
+);
+create index if not exists commands_device_status on commands (device_id, status);
