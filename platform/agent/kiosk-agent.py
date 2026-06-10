@@ -5,18 +5,15 @@ Verwaltungsplattform (Pull-Prinzip, funktioniert hinter NAT/Firewall).
 
 Pro Zyklus:
   - POST {API}/api/agent/sync mit dem Geraete-Token (Heartbeat + Quittungen)
-  - empfaengt Seiten-Config -> schreibt sites.json, startet bei Aenderung den Kiosk neu
+  - empfaengt Seiten-Config -> schreibt sites.json NUR bei echter Aenderung,
+    startet dann den Kiosk neu
   - fuehrt Befehle aus (restart_app, reboot, reload_config) und quittiert sie
+    SOFORT (verhindert wiederholtes Ausfuehren / Neustart-Schleifen)
   - schaltet den Bildschirm nach Zeitplan an/aus (optional)
 
 Konfiguration ueber Umgebungsvariablen (siehe kiosk-agent.env.example):
-  KIOSK_API_URL          z.B. https://dein-projekt.vercel.app
-  KIOSK_DEVICE_TOKEN     Geheim-Token des Geraets (aus der Plattform)
-  KIOSK_SITES_PATH       Pfad zur sites.json (Default: ~/kiosk-display/sites.json)
-  KIOSK_RESTART_CMD      Kiosk-Neustart (Default: systemctl --user restart kiosk)
-  KIOSK_POLL_SECONDS     Poll-Intervall (Default: 15)
-  KIOSK_OUTPUT           Display-Output fuer die Zeitsteuerung (Default: HDMI-A-1)
-  KIOSK_CURRENT_SITE_FILE  Optional: Datei, in die der Kiosk die aktuelle Seite schreibt
+  KIOSK_API_URL, KIOSK_DEVICE_TOKEN, KIOSK_SITES_PATH, KIOSK_RESTART_CMD,
+  KIOSK_POLL_SECONDS, KIOSK_OUTPUT, KIOSK_CURRENT_SITE_FILE
 """
 import json
 import os
@@ -35,9 +32,8 @@ POLL_SECONDS = int(os.environ.get('KIOSK_POLL_SECONDS', '15'))
 OUTPUT = os.environ.get('KIOSK_OUTPUT', 'HDMI-A-1')
 CURRENT_SITE_FILE = os.environ.get('KIOSK_CURRENT_SITE_FILE',
                                    os.path.expanduser('~/.cache/kiosk-current-site'))
-AGENT_VERSION = '1.0'
+AGENT_VERSION = '1.1'
 
-_last_sites_json = None   # zuletzt geschriebene sites.json (Aenderungsvergleich)
 _screen_on = None         # zuletzt gesetzter Bildschirm-Zustand
 _pending_ack = []         # ausgefuehrte Befehle, beim naechsten Sync zu quittieren
 
@@ -68,22 +64,30 @@ def sync(current_site):
     return result
 
 
+def _read_sites_file():
+    try:
+        with open(SITES_PATH, 'r', encoding='utf-8') as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
 def write_sites(config):
-    """sites.json im vom Kiosk erwarteten Format schreiben. True bei Aenderung."""
-    global _last_sites_json
+    """sites.json schreiben, NUR wenn sich der Inhalt wirklich aendert.
+    Vergleich gegen die DATEI (nicht den Speicher), damit ein Agent-Neustart
+    keinen unnoetigen Kiosk-Neustart ausloest (= keine Neustart-Schleife)."""
     out = {
         'rotationInterval': config.get('rotationInterval', 15),
         'idleTimeout': config.get('idleTimeout', 5),
         'sites': config.get('sites', []),
     }
-    text = json.dumps(out, ensure_ascii=False, indent=2)
-    if text == _last_sites_json:
+    if _read_sites_file() == out:
         return False
+    text = json.dumps(out, ensure_ascii=False, indent=2)
     tmp = SITES_PATH + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as fh:
         fh.write(text + '\n')
     os.replace(tmp, SITES_PATH)  # atomar
-    _last_sites_json = text
     return True
 
 
@@ -93,16 +97,16 @@ def restart_kiosk():
 
 
 def run_command(cmd):
-    """Plattform-Befehl ausfuehren; (status, result) zurueckgeben."""
+    """Plattform-Befehl ausfuehren. Gibt (status, result) zurueck.
+    Status 'reboot' signalisiert: erst quittieren, DANN rebooten (sonst Reboot-Loop)."""
     t = cmd.get('type')
     try:
         if t in ('restart_app', 'reload_config'):
             restart_kiosk()
-        elif t == 'reboot':
-            subprocess.run('sudo reboot', shell=True, check=False)
-        else:
-            return 'failed', 'unbekannter Befehl: %s' % t
-        return 'done', None
+            return 'done', None
+        if t == 'reboot':
+            return 'reboot', None
+        return 'failed', 'unbekannter Befehl: %s' % t
     except Exception as exc:  # noqa: BLE001
         return 'failed', str(exc)
 
@@ -125,7 +129,6 @@ def set_screen(on):
 
 
 def _parse_time(value):
-    """'HH:MM' oder 'HH:MM:SS' -> datetime.time, sonst None."""
     if not value:
         return None
     try:
@@ -163,10 +166,23 @@ def main():
                 log('sites.json aktualisiert -> Kiosk neu laden')
                 restart_kiosk()
             apply_schedule(config)
-            for cmd in result.get('commands', []):
+
+            commands = result.get('commands', [])
+            reboot_after = False
+            for cmd in commands:
                 log('Befehl: %s' % cmd.get('type'))
                 status, res = run_command(cmd)
+                if status == 'reboot':
+                    reboot_after = True
+                    status, res = 'done', None
                 _pending_ack.append({'id': cmd.get('id'), 'status': status, 'result': res})
+
+            if commands:
+                # Sofort quittieren, damit Befehle nicht erneut geholt/ausgefuehrt werden.
+                sync(read_current_site())
+            if reboot_after:
+                log('Reboot ausfuehren')
+                subprocess.run('sudo reboot', shell=True, check=False)
         except urllib.error.URLError as exc:
             log('Netzwerkfehler: %s' % exc)
         except Exception as exc:  # noqa: BLE001
