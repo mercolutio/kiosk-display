@@ -54,9 +54,12 @@ export async function POST(req: Request) {
     if (elapsedSec > 0 && elapsedSec <= 60) {
       const isNewView = currentSite !== device.current_site ? 1 : 0;
       try {
+        // Nur konfigurierte Seiten zaehlen -> Start-/Default-Seiten oder manuell
+        // angesteuerte Fremdseiten verfaelschen die Statistik nicht.
         await sql`
           insert into site_stats (device_id, url, day, seconds, views)
-          values (${device.id}, ${currentSite}, current_date, ${elapsedSec}, ${isNewView})
+          select ${device.id}, ${currentSite}, current_date, ${elapsedSec}, ${isNewView}
+           where exists (select 1 from sites where device_id = ${device.id} and url = ${currentSite})
           on conflict (device_id, url, day) do update
             set seconds = site_stats.seconds + ${elapsedSec},
                 views   = site_stats.views   + ${isNewView}

@@ -21,7 +21,13 @@ let mainWindow;
 
 function loadConfig() {
   const configPath = path.join(__dirname, 'sites.json');
-  return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  try {
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch (e) {
+    // Keine/ungueltige sites.json (z. B. vor dem ersten Agent-Sync): leere Liste,
+    // der Renderer zeigt "Keine Seiten konfiguriert" statt zu crashen.
+    return { rotationInterval: 15, idleTimeout: 5, sites: [] };
+  }
 }
 
 function createWindow() {
