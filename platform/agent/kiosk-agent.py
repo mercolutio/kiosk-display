@@ -4,11 +4,12 @@ Kiosk-Agent — laeuft auf dem Raspberry Pi und verbindet ihn mit der
 Verwaltungsplattform (Pull-Prinzip, funktioniert hinter NAT/Firewall).
 
 Pro Zyklus:
-  - POST {API}/api/agent/sync mit dem Geraete-Token (Heartbeat + Quittungen)
+  - POST {API}/api/agent/sync mit dem Geraete-Token (Heartbeat + Quittungen + Log)
   - empfaengt Seiten-Config -> schreibt sites.json NUR bei echter Aenderung,
     startet dann den Kiosk neu
   - fuehrt Befehle aus (restart_app, reboot, reload_config) und quittiert sie
     SOFORT (verhindert wiederholtes Ausfuehren / Neustart-Schleifen)
+  - meldet Ereignisse (Start, Befehle, Neustarts, Fehler, Heartbeat) ans Dashboard
   - schaltet den Bildschirm nach Zeitplan an/aus (optional)
 
 Konfiguration ueber Umgebungsvariablen (siehe kiosk-agent.env.example):
@@ -32,14 +33,18 @@ POLL_SECONDS = int(os.environ.get('KIOSK_POLL_SECONDS', '15'))
 OUTPUT = os.environ.get('KIOSK_OUTPUT', 'HDMI-A-1')
 CURRENT_SITE_FILE = os.environ.get('KIOSK_CURRENT_SITE_FILE',
                                    os.path.expanduser('~/.cache/kiosk-current-site'))
-AGENT_VERSION = '1.1'
+AGENT_VERSION = '1.2'
 
 _screen_on = None         # zuletzt gesetzter Bildschirm-Zustand
 _pending_ack = []         # ausgefuehrte Befehle, beim naechsten Sync zu quittieren
+_pending_logs = []        # Ereignisse fuers Dashboard, beim naechsten Sync uebermittelt
 
 
-def log(msg):
+def log(msg, level='info'):
     print('[kiosk-agent] ' + msg, flush=True)
+    _pending_logs.append({'level': level, 'message': msg})
+    if len(_pending_logs) > 50:        # nicht unbegrenzt puffern (z.B. lange offline)
+        del _pending_logs[:-50]
 
 
 def read_current_site():
@@ -52,15 +57,21 @@ def read_current_site():
 
 def sync(current_site):
     """Einen Sync-Zyklus durchfuehren; Antwort (dict) zurueckgeben."""
-    global _pending_ack
-    payload = {'agent_version': AGENT_VERSION, 'current_site': current_site, 'ack': _pending_ack}
+    global _pending_ack, _pending_logs
+    payload = {
+        'agent_version': AGENT_VERSION,
+        'current_site': current_site,
+        'ack': _pending_ack,
+        'logs': _pending_logs,
+    }
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(API_URL + '/api/agent/sync', data=data, method='POST')
     req.add_header('Content-Type', 'application/json')
     req.add_header('Authorization', 'Bearer ' + TOKEN)
     with urllib.request.urlopen(req, timeout=20) as resp:
         result = json.loads(resp.read().decode('utf-8'))
-    _pending_ack = []  # erfolgreich uebermittelt
+    _pending_ack = []   # erfolgreich uebermittelt
+    _pending_logs = []
     return result
 
 
@@ -92,7 +103,6 @@ def write_sites(config):
 
 
 def restart_kiosk():
-    log('Kiosk neu starten: ' + RESTART_CMD)
     subprocess.run(RESTART_CMD, shell=True, check=False)
 
 
@@ -155,38 +165,43 @@ def apply_schedule(config):
 
 def main():
     if not API_URL or not TOKEN:
-        log('FEHLER: KIOSK_API_URL und KIOSK_DEVICE_TOKEN muessen gesetzt sein.')
+        log('FEHLER: KIOSK_API_URL und KIOSK_DEVICE_TOKEN muessen gesetzt sein.', 'error')
         sys.exit(1)
-    log('Start. API=%s Poll=%ss' % (API_URL, POLL_SECONDS))
+    log('Agent gestartet (v%s), Poll alle %ss' % (AGENT_VERSION, POLL_SECONDS))
+    sync_count = 0
     while True:
         try:
             result = sync(read_current_site())
             config = result.get('config', {})
+            sync_count += 1
+            if sync_count % 10 == 1:   # periodisches Lebenszeichen (~alle 10 Zyklen)
+                log('Heartbeat — %d Seite(n) online' % len(config.get('sites', [])))
+
             if write_sites(config):
-                log('sites.json aktualisiert -> Kiosk neu laden')
+                log('Seiten-Konfiguration geaendert -> Kiosk neu laden')
                 restart_kiosk()
             apply_schedule(config)
 
             commands = result.get('commands', [])
             reboot_after = False
             for cmd in commands:
-                log('Befehl: %s' % cmd.get('type'))
                 status, res = run_command(cmd)
                 if status == 'reboot':
                     reboot_after = True
                     status, res = 'done', None
+                log('Befehl ausgefuehrt: %s -> %s' % (cmd.get('type'), status))
                 _pending_ack.append({'id': cmd.get('id'), 'status': status, 'result': res})
 
             if commands:
                 # Sofort quittieren, damit Befehle nicht erneut geholt/ausgefuehrt werden.
                 sync(read_current_site())
             if reboot_after:
-                log('Reboot ausfuehren')
+                log('Reboot wird ausgefuehrt')
                 subprocess.run('sudo reboot', shell=True, check=False)
         except urllib.error.URLError as exc:
-            log('Netzwerkfehler: %s' % exc)
+            log('Netzwerkfehler: %s' % exc, 'error')
         except Exception as exc:  # noqa: BLE001
-            log('Fehler: %s' % exc)
+            log('Fehler: %s' % exc, 'error')
         time.sleep(POLL_SECONDS)
 
 

@@ -33,6 +33,17 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
      where device_id = ${id} order by created_at desc limit 5
   `;
 
+  let events: any[] = [];
+  try {
+    const r = await sql`
+      select level, message, created_at from events
+       where device_id = ${id} order by created_at desc limit 50
+    `;
+    events = r.rows;
+  } catch {
+    /* events-Tabelle evtl. noch nicht angelegt */
+  }
+
   const h = await headers();
   const host = h.get('host') || 'dein-projekt.vercel.app';
   const proto = (h.get('x-forwarded-proto') || 'https').split(',')[0];
@@ -70,6 +81,27 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             <> · letzter Befehl: {commands[0].type} ({commands[0].status})</>
           )}
         </p>
+      </div>
+
+      {/* Aktivität / Log */}
+      <div className="card">
+        <h2>Aktivität ({events.length})</h2>
+        {events.length === 0 ? (
+          <p className="muted">Noch keine Ereignisse. Sobald der Agent meldet, erscheinen sie hier — live.</p>
+        ) : (
+          <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+            {events.map((e: any, i: number) => (
+              <div key={i} className="row" style={{ gap: 10, padding: '4px 0', borderBottom: '1px solid #1e1e20', fontSize: 13 }}>
+                <span className="muted" style={{ minWidth: 140, fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>
+                  {new Date(e.created_at).toLocaleString('de-DE')}
+                </span>
+                <span style={{ color: e.level === 'error' ? '#ff9a9a' : e.level === 'warn' ? '#ffd27a' : '#cfcfd2' }}>
+                  {e.message}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Seiten */}
