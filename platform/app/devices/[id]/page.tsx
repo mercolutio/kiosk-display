@@ -7,6 +7,7 @@ import {
   addSite, updateSite, deleteSite, moveSite,
   enqueueCommand,
 } from '../../actions';
+import AutoRefresh from '../../auto-refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="container">
+      <AutoRefresh seconds={10} />
       <div className="header">
         <h1><Link href="/">← Geräte</Link> / {device.name}</h1>
         <span className={isOnline(device.last_seen_at) ? 'badge-online' : 'badge-offline'}>

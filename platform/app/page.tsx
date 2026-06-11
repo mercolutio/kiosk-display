@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { sql } from '@/lib/db';
 import { createDevice, logout } from './actions';
+import AutoRefresh from './auto-refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,7 @@ export default async function Dashboard() {
 
   return (
     <div className="container">
+      <AutoRefresh seconds={10} />
       <div className="header">
         <h1>Kiosk-Verwaltung</h1>
         <form action={logout}>

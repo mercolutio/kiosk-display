@@ -589,17 +589,44 @@
       }, 500);
     }
 
-    // Config empfangen und starten
+    // Config empfangen und starten — aber erst, wenn eine Internetverbindung da ist
     window.kiosk.onConfig((cfg) => {
       config = cfg;
       if (config.sites.length === 0) {
         siteName.textContent = 'Keine Seiten konfiguriert';
         return;
       }
+      startWhenOnline();
+    });
+
+    // Prueft echte Erreichbarkeit (nicht nur den Interface-Status von navigator.onLine).
+    async function hasInternet() {
+      if (navigator.onLine === false) return false;
+      const targets = [];
+      try { if (config.sites[0]) targets.push(new URL(config.sites[0].url).origin); } catch (e) {}
+      targets.push('https://www.google.com/generate_204');
+      for (const t of targets) {
+        try {
+          await fetch(t, { mode: 'no-cors', cache: 'no-store' });
+          return true;
+        } catch (e) { /* naechstes Ziel probieren */ }
+      }
+      return false;
+    }
+
+    // Startet die Rotation erst, sobald Internet verfuegbar ist. Offline bleibt ein
+    // Warte-Hinweis stehen — keine kaputten Seiten, keine Neustart-Schleife.
+    async function startWhenOnline() {
+      while (!(await hasInternet())) {
+        siteName.textContent = 'Warte auf Netzwerkverbindung…';
+        loadingScreen.classList.remove('hidden');
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+      loadingScreen.classList.add('hidden');
       initDots();
       loadSite(0);
       startTimerLoop();
-    });
+    }
     // ── On-Screen Keyboard ──────────────────────────────────────────
     const keyboard = document.getElementById('keyboard');
     let kbShift = false;
