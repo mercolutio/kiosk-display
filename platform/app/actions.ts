@@ -57,10 +57,16 @@ export async function updateDeviceSettings(formData: FormData) {
   await sql`
     update devices
        set name = ${name}, rotation_interval = ${rotation}, idle_timeout = ${idle},
-           screen_on_time = ${onTime}, screen_off_time = ${offTime},
-           remote_url = ${remoteUrl}
+           screen_on_time = ${onTime}, screen_off_time = ${offTime}
      where id = ${id}
   `;
+  // Fernsteuer-Adresse separat schreiben, damit eine (noch) fehlende Spalte
+  // remote_url das Speichern der uebrigen Einstellungen nicht verhindert.
+  try {
+    await sql`update devices set remote_url = ${remoteUrl} where id = ${id}`;
+  } catch {
+    /* Spalte remote_url evtl. noch nicht migriert -> ignorieren */
+  }
   revalidatePath(`/devices/${id}`);
 }
 
