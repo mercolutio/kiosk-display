@@ -36,10 +36,17 @@ command -v git >/dev/null 2>&1 || sudo apt install -y git
 echo "==> Repo holen ($BRANCH)"
 if [ -d "$DIR/.git" ]; then
   git -C "$DIR" fetch origin "$BRANCH"
-  git -C "$DIR" checkout "$BRANCH"
-  git -C "$DIR" pull --ff-only origin "$BRANCH"
+  git -C "$DIR" reset --hard "origin/$BRANCH"
 else
   git clone --branch "$BRANCH" "$REPO_URL" "$DIR"
+fi
+
+# sites.json ist Laufzeit-Status (vom Agent geschrieben, nicht in git). Falls keine
+# vorhanden ist (frische Installation / nach Reset), leere Startvorlage anlegen, damit
+# der Kiosk sauber startet, bis der Agent die echte Konfiguration schreibt.
+if [ ! -f "$DIR/sites.json" ]; then
+  cp "$DIR/sites.example.json" "$DIR/sites.json" 2>/dev/null \
+    || echo '{"rotationInterval":15,"idleTimeout":5,"sites":[]}' > "$DIR/sites.json"
 fi
 
 echo "==> Electron installieren (kann ein paar Minuten dauern)"

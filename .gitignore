@@ -1,3 +1,7 @@
 node_modules/
 __pycache__/
 *.pyc
+
+# Laufzeit-Status: wird vom Kiosk-Agent geschrieben, gehoert nicht ins Repo.
+# (Vorlage: sites.example.json)
+sites.json
