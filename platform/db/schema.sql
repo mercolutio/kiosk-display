@@ -62,6 +62,8 @@ create table if not exists site_stats (
   day        date not null default current_date,
   seconds    int  not null default 0,           -- aufsummierte Anzeigezeit
   views      int  not null default 0,            -- Anzahl Wechsel auf diese Seite
+  pauses        int not null default 0,          -- Anzahl Interaktionen (Timer-Stopps durch Bedienung)
+  pause_seconds int not null default 0,          -- Gesamtdauer dieser Interaktionen
   primary key (device_id, url, day)
 );
 create index if not exists site_stats_device_day on site_stats (device_id, day);

@@ -54,16 +54,30 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
   let stats: any[] = [];
   try {
     const r = await sql`
-      select url, sum(seconds)::int as seconds, sum(views)::int as views
+      select url, sum(seconds)::int as seconds, sum(views)::int as views,
+             sum(pauses)::int as pauses, sum(pause_seconds)::int as pause_seconds
         from site_stats
        where device_id = ${id} and day >= current_date - 6
        group by url order by seconds desc
     `;
     stats = r.rows;
   } catch {
-    /* site_stats-Tabelle evtl. noch nicht angelegt */
+    // Faellt zurueck, falls die Interaktions-Spalten (pauses/pause_seconds)
+    // in der DB noch nicht migriert sind.
+    try {
+      const r2 = await sql`
+        select url, sum(seconds)::int as seconds, sum(views)::int as views
+          from site_stats
+         where device_id = ${id} and day >= current_date - 6
+         group by url order by seconds desc
+      `;
+      stats = r2.rows;
+    } catch {
+      /* site_stats-Tabelle evtl. noch nicht angelegt */
+    }
   }
   const statsTotal = stats.reduce((a: number, s: any) => a + (s.seconds || 0), 0);
+  const statsPauses = stats.reduce((a: number, s: any) => a + (s.pauses || 0), 0);
 
   const h = await headers();
   const host = h.get('host') || 'dein-projekt.vercel.app';
@@ -168,11 +182,16 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                   <div style={{ height: 6, background: '#1e1e20', borderRadius: 3, overflow: 'hidden' }}>
                     <div style={{ width: pct + '%', height: '100%', background: '#34c759' }} />
                   </div>
+                  {(s.pauses || 0) > 0 && (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>
+                      🖐️ {s.pauses}× bedient · {fmtDur(s.pause_seconds || 0)} interagiert
+                    </div>
+                  )}
                 </div>
               );
             })}
             <p className="muted" style={{ marginTop: 10 }}>
-              Gesamt: {fmtDur(statsTotal)} Anzeigezeit · ungefähre Werte (alle ~15 s erfasst).
+              Gesamt: {fmtDur(statsTotal)} Anzeigezeit{statsPauses > 0 ? ` · ${statsPauses}× bedient` : ''} · ungefähre Werte (Anzeigezeit alle ~15 s erfasst).
             </p>
           </div>
         )}
