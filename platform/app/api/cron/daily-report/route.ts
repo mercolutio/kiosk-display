@@ -17,7 +17,10 @@ export const maxDuration = 30;
 
 const TZ = 'Europe/Berlin';
 const DEFAULT_FROM = 'microwerbung Report <onboarding@resend.dev>';
-const DEFAULT_TO = 'd.schloesser@mercolutio.com,info@velvetgreen-immobilien.de';
+// Standard-Empfaenger. info@velvetgreen-immobilien.de wieder aufnehmen
+// (kommagetrennt via REPORT_TO oder hier), sobald in Resend eine Domain
+// verifiziert und REPORT_FROM gesetzt ist — sonst lehnt Resend Fremdadressen ab.
+const DEFAULT_TO = 'd.schloesser@mercolutio.com';
 
 function esc(s: any): string {
   return String(s ?? '').replace(/[&<>"]/g, (c) =>
