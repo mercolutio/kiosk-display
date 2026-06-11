@@ -128,9 +128,11 @@ export async function GET(req: Request) {
   });
   const body = await resp.json().catch(() => ({}));
   if (!resp.ok) {
+    console.error('[daily-report] Resend-Fehler', resp.status, JSON.stringify(body));
     return NextResponse.json({ error: 'resend', status: resp.status, body }, { status: 502 });
   }
-  return NextResponse.json({ sent: true, to, id: (body as any).id });
+  console.log('[daily-report] gesendet an', to.join(', '), '->', (body as any).id);
+  return NextResponse.json({ sent: true, from, to, id: (body as any).id });
 }
 
 function kpi(label: string, value: string, danger = false): string {
