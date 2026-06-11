@@ -32,6 +32,8 @@ if ! command -v node >/dev/null 2>&1; then
   sudo apt install -y nodejs
 fi
 command -v git >/dev/null 2>&1 || sudo apt install -y git
+# wlr-randr: fuer die Bildschirm-Zeitsteuerung (an/aus nach Zeitplan).
+command -v wlr-randr >/dev/null 2>&1 || sudo apt install -y wlr-randr
 
 echo "==> Repo holen ($BRANCH)"
 if [ -d "$DIR/.git" ]; then
