@@ -69,6 +69,38 @@ journalctl --user -u kiosk-agent -f
 > `mv ~/.config/autostart/kiosk-display.desktop ~/.config/autostart/kiosk-display.desktop.bak`
 > (bei dir bereits erledigt).
 
+### Schnell-Installation (ein Befehl)
+
+```bash
+git clone --branch claude/gallant-thompson-RB2Fq \
+  https://github.com/mercolutio/kiosk-display.git ~/kiosk-display
+bash ~/kiosk-display/platform/agent/install.sh
+```
+
+Das Skript holt Repo + Electron, installiert Agent + Services, fragt
+API-URL + Token ab und **bietet die Live-Fernsteuerung gleich mit an**.
+
+### Live-Fernsteuerung (Tailscale + VNC)
+
+Bildschirm im Dashboard sehen **und** bedienen — kostenlos, nichts
+selbst gehostet, funktioniert auch hinter fremdem WLAN.
+
+- `setup-remote.sh` installiert Tailscale + `wayvnc` (VNC der labwc-Sitzung,
+  nur `127.0.0.1:5900`) + noVNC/`websockify` (Browser-VNC, gebunden an die
+  **Tailnet-IP** — also nicht offen im lokalen Netz).
+- Wird von `install.sh` automatisch angeboten. Nachträglich/zum Nachrüsten
+  bestehender Geräte:
+
+  ```bash
+  bash ~/kiosk-display/platform/agent/setup-remote.sh
+  ```
+
+- Beim ersten Mal einmal mit dem Tailscale-Konto bestätigen (Login-Link).
+  Für Flotten-Rollout ohne Rückfrage: `TS_AUTHKEY=tskey-… bash setup-remote.sh`.
+- Am Ende zeigt das Skript die **Fernsteuer-Adresse** an — die im Dashboard beim
+  Gerät unter *Einstellungen → „Fernsteuer-Adresse"* eintragen. Danach erscheint
+  dort der Knopf **🖥️ Fernsteuern**.
+
 ## Sync-Protokoll
 
 `POST /api/agent/sync`, Header `Authorization: Bearer <device_token>`
