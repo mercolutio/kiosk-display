@@ -53,10 +53,12 @@ export async function updateDeviceSettings(formData: FormData) {
   const idle = parseInt(String(formData.get('idle_timeout') || '5'), 10) || 5;
   const onTime = String(formData.get('screen_on_time') || '').trim() || null;
   const offTime = String(formData.get('screen_off_time') || '').trim() || null;
+  const remoteUrl = String(formData.get('remote_url') || '').trim() || null;
   await sql`
     update devices
        set name = ${name}, rotation_interval = ${rotation}, idle_timeout = ${idle},
-           screen_on_time = ${onTime}, screen_off_time = ${offTime}
+           screen_on_time = ${onTime}, screen_off_time = ${offTime},
+           remote_url = ${remoteUrl}
      where id = ${id}
   `;
   revalidatePath(`/devices/${id}`);

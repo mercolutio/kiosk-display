@@ -63,6 +63,11 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
       <div className="card">
         <h2>Fernsteuerung</h2>
         <div className="row">
+          {device.remote_url && (
+            <a className="btn-primary" href={device.remote_url} target="_blank" rel="noreferrer">
+              🖥️ Fernsteuern
+            </a>
+          )}
           <form action={enqueueCommand}>
             <input type="hidden" name="device_id" value={id} />
             <input type="hidden" name="type" value="restart_app" />
@@ -74,6 +79,12 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             <button type="submit">Pi neu starten</button>
           </form>
         </div>
+        {!device.remote_url && (
+          <p className="muted" style={{ marginTop: 10 }}>
+            Live-Fernsteuerung: trag unten in den Einstellungen die Fernsteuer-Adresse ein,
+            dann erscheint hier der <strong>🖥️ Fernsteuern</strong>-Knopf.
+          </p>
+        )}
         <p className="muted" style={{ marginTop: 10 }}>
           Aktuelle Seite: {device.current_site || '—'} · zuletzt gesehen:{' '}
           {device.last_seen_at ? new Date(device.last_seen_at).toLocaleString('de-DE') : 'nie'}
@@ -173,6 +184,15 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             <div>
               <label>Bildschirm aus ab (optional)</label>
               <input name="screen_off_time" type="time" defaultValue={hhmm(device.screen_off_time)} style={{ width: '100%' }} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label>Fernsteuer-Adresse (optional)</label>
+              <input name="remote_url" type="url" defaultValue={device.remote_url || ''}
+                     placeholder="http://100.x.x.x:6080/vnc.html?autoconnect=1&resize=remote"
+                     style={{ width: '100%' }} />
+              <p className="muted" style={{ marginTop: 4, fontSize: 12 }}>
+                Browser-Adresse der Live-Steuerung (VNC). Leer lassen = aus.
+              </p>
             </div>
           </div>
           <button className="btn-primary" type="submit" style={{ marginTop: 14 }}>Speichern</button>

@@ -15,6 +15,7 @@ create table if not exists devices (
   last_seen_at     timestamptz,                    -- letzter Heartbeat (online/offline)
   current_site     text,                           -- vom Agent gemeldete aktuelle Seite
   agent_version    text,
+  remote_url       text,                           -- Live-Fernsteuerung (VNC/noVNC im Browser)
   created_at       timestamptz not null default now()
 );
 
