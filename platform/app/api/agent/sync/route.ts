@@ -44,6 +44,29 @@ export async function POST(req: Request) {
      where id = ${device.id}
   `;
 
+  // Wiedergabe-Statistik: die seit dem letzten Heartbeat vergangene Zeit der
+  // aktuell gemeldeten Seite gutschreiben (Sampling). Lange Luecken (offline)
+  // werden ignoriert, damit nur echte Anzeigezeit zaehlt. (device.* sind hier
+  // noch die VORHERIGEN Werte vor dem Update oben.)
+  if (currentSite) {
+    const prevSeenMs = device.last_seen_at ? new Date(device.last_seen_at).getTime() : 0;
+    const elapsedSec = prevSeenMs ? Math.round((Date.now() - prevSeenMs) / 1000) : 0;
+    if (elapsedSec > 0 && elapsedSec <= 60) {
+      const isNewView = currentSite !== device.current_site ? 1 : 0;
+      try {
+        await sql`
+          insert into site_stats (device_id, url, day, seconds, views)
+          values (${device.id}, ${currentSite}, current_date, ${elapsedSec}, ${isNewView})
+          on conflict (device_id, url, day) do update
+            set seconds = site_stats.seconds + ${elapsedSec},
+                views   = site_stats.views   + ${isNewView}
+        `;
+      } catch {
+        /* site_stats-Tabelle evtl. noch nicht migriert -> ignorieren */
+      }
+    }
+  }
+
   // Vom Agent ausgefuehrte Befehle quittieren.
   if (Array.isArray(body.ack)) {
     for (const a of body.ack) {

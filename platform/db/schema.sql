@@ -53,3 +53,15 @@ create table if not exists events (
   created_at  timestamptz not null default now()
 );
 create index if not exists events_device_time on events (device_id, created_at desc);
+
+-- Wiedergabe-Statistik je Geraet+Seite+Tag (vom Sync-Endpoint per Sampling
+-- aufsummiert): Anzeigezeit (Sekunden) und Anzahl Aufrufe (Wechsel auf die Seite).
+create table if not exists site_stats (
+  device_id  uuid not null references devices(id) on delete cascade,
+  url        text not null,
+  day        date not null default current_date,
+  seconds    int  not null default 0,           -- aufsummierte Anzeigezeit
+  views      int  not null default 0,            -- Anzahl Wechsel auf diese Seite
+  primary key (device_id, url, day)
+);
+create index if not exists site_stats_device_day on site_stats (device_id, day);

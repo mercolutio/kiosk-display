@@ -359,7 +359,7 @@
       webview.src = site.url;
       updateDots();
       resetTimer();
-
+      try { window.kiosk.reportSite(site.url); } catch (e) {}
     }
 
     function nextSite() {

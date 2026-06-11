@@ -17,6 +17,13 @@ function isOnline(lastSeen: string | null): boolean {
 function hhmm(t: string | null): string {
   return t ? String(t).slice(0, 5) : '';
 }
+function fmtDur(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h} h ${m} min`;
+  if (m > 0) return `${m} min`;
+  return `${s} s`;
+}
 
 export default async function DevicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -43,6 +50,20 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
   } catch {
     /* events-Tabelle evtl. noch nicht angelegt */
   }
+
+  let stats: any[] = [];
+  try {
+    const r = await sql`
+      select url, sum(seconds)::int as seconds, sum(views)::int as views
+        from site_stats
+       where device_id = ${id} and day >= current_date - 6
+       group by url order by seconds desc
+    `;
+    stats = r.rows;
+  } catch {
+    /* site_stats-Tabelle evtl. noch nicht angelegt */
+  }
+  const statsTotal = stats.reduce((a: number, s: any) => a + (s.seconds || 0), 0);
 
   const h = await headers();
   const host = h.get('host') || 'dein-projekt.vercel.app';
@@ -121,6 +142,38 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                 </span>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Wiedergabe-Statistik */}
+      <div className="card">
+        <h2>Wiedergabe-Statistik (7 Tage)</h2>
+        {stats.length === 0 ? (
+          <p className="muted">
+            Noch keine Daten. Sobald die Geräte die laufende Seite melden, erscheint hier pro
+            Seite die Anzeigezeit und wie oft sie lief — fürs Abrechnen und als Nachweis.
+          </p>
+        ) : (
+          <div>
+            {stats.map((s: any, i: number) => {
+              const name = sites.find((x: any) => x.url === s.url)?.name || s.url;
+              const pct = statsTotal ? Math.round((s.seconds / statsTotal) * 100) : 0;
+              return (
+                <div key={i} style={{ marginBottom: 10 }}>
+                  <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontWeight: 600 }}>{name}</span>
+                    <span className="muted">{fmtDur(s.seconds)} · {s.views}× · {pct}%</span>
+                  </div>
+                  <div style={{ height: 6, background: '#1e1e20', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: pct + '%', height: '100%', background: '#34c759' }} />
+                  </div>
+                </div>
+              );
+            })}
+            <p className="muted" style={{ marginTop: 10 }}>
+              Gesamt: {fmtDur(statsTotal)} Anzeigezeit · ungefähre Werte (alle ~15 s erfasst).
+            </p>
           </div>
         )}
       </div>
