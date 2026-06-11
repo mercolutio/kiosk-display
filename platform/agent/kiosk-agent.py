@@ -29,11 +29,13 @@ API_URL = os.environ.get('KIOSK_API_URL', '').rstrip('/')
 TOKEN = os.environ.get('KIOSK_DEVICE_TOKEN', '')
 SITES_PATH = os.environ.get('KIOSK_SITES_PATH', os.path.expanduser('~/kiosk-display/sites.json'))
 RESTART_CMD = os.environ.get('KIOSK_RESTART_CMD', 'systemctl --user restart kiosk')
+START_CMD = os.environ.get('KIOSK_START_CMD', 'systemctl --user start kiosk')
+STOP_CMD = os.environ.get('KIOSK_STOP_CMD', 'systemctl --user stop kiosk')
 POLL_SECONDS = int(os.environ.get('KIOSK_POLL_SECONDS', '15'))
 OUTPUT = os.environ.get('KIOSK_OUTPUT', 'HDMI-A-1')
 CURRENT_SITE_FILE = os.environ.get('KIOSK_CURRENT_SITE_FILE',
                                    os.path.expanduser('~/.cache/kiosk-current-site'))
-AGENT_VERSION = '1.2'
+AGENT_VERSION = '1.3'
 
 _screen_on = None         # zuletzt gesetzter Bildschirm-Zustand
 _pending_ack = []         # ausgefuehrte Befehle, beim naechsten Sync zu quittieren
@@ -113,6 +115,12 @@ def run_command(cmd):
     try:
         if t in ('restart_app', 'reload_config'):
             restart_kiosk()
+            return 'done', None
+        if t == 'start_app':
+            subprocess.run(START_CMD, shell=True, check=False)
+            return 'done', None
+        if t == 'stop_app':
+            subprocess.run(STOP_CMD, shell=True, check=False)
             return 'done', None
         if t == 'reboot':
             return 'reboot', None

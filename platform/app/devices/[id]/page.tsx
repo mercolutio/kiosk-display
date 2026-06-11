@@ -70,8 +70,18 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
           )}
           <form action={enqueueCommand}>
             <input type="hidden" name="device_id" value={id} />
+            <input type="hidden" name="type" value="start_app" />
+            <button className="btn-primary" type="submit">Kiosk starten</button>
+          </form>
+          <form action={enqueueCommand}>
+            <input type="hidden" name="device_id" value={id} />
             <input type="hidden" name="type" value="restart_app" />
             <button className="btn-primary" type="submit">Kiosk neu starten</button>
+          </form>
+          <form action={enqueueCommand}>
+            <input type="hidden" name="device_id" value={id} />
+            <input type="hidden" name="type" value="stop_app" />
+            <button type="submit">Kiosk beenden</button>
           </form>
           <form action={enqueueCommand}>
             <input type="hidden" name="device_id" value={id} />

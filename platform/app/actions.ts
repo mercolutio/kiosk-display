@@ -135,8 +135,12 @@ export async function moveSite(formData: FormData) {
 export async function enqueueCommand(formData: FormData) {
   const deviceId = String(formData.get('device_id') || '');
   const type = String(formData.get('type') || '');
-  if (deviceId && ['restart_app', 'reboot', 'reload_config'].includes(type)) {
-    await sql`insert into commands (device_id, type) values (${deviceId}, ${type})`;
+  if (deviceId && ['restart_app', 'stop_app', 'start_app', 'reboot', 'reload_config'].includes(type)) {
+    try {
+      await sql`insert into commands (device_id, type) values (${deviceId}, ${type})`;
+    } catch {
+      /* z. B. wenn die Typ-Pruefung (stop_app/start_app) in der DB noch nicht migriert ist */
+    }
   }
   revalidatePath(`/devices/${deviceId}`);
 }
