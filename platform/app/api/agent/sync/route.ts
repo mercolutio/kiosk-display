@@ -59,6 +59,25 @@ export async function POST(req: Request) {
     }
   }
 
+  // Aktivitaets-Log des Agents speichern (best effort; ohne events-Tabelle uebersprungen).
+  if (Array.isArray(body.logs) && body.logs.length > 0) {
+    try {
+      for (const e of body.logs.slice(-50)) {
+        if (e && typeof e.message === 'string') {
+          const level = e.level === 'error' || e.level === 'warn' ? e.level : 'info';
+          await sql`insert into events (device_id, level, message) values (${device.id}, ${level}, ${e.message})`;
+        }
+      }
+      await sql`
+        delete from events where device_id = ${device.id} and id not in (
+          select id from events where device_id = ${device.id} order by created_at desc limit 200
+        )
+      `;
+    } catch {
+      /* events-Tabelle evtl. noch nicht angelegt -> ignorieren */
+    }
+  }
+
   // Aktuelle Seiten-Config zusammenstellen (nur aktivierte, in Reihenfolge).
   const { rows: siteRows } = await sql`
     select name, url, duration from sites

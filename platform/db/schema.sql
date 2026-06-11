@@ -42,3 +42,13 @@ create table if not exists commands (
   executed_at timestamptz
 );
 create index if not exists commands_device_status on commands (device_id, status);
+
+-- Aktivitaets-/Ereignis-Log je Geraet (vom Agent gemeldet, fuers Dashboard).
+create table if not exists events (
+  id          uuid primary key default gen_random_uuid(),
+  device_id   uuid not null references devices(id) on delete cascade,
+  level       text not null default 'info',          -- info | warn | error
+  message     text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists events_device_time on events (device_id, created_at desc);
