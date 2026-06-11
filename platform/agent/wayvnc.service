@@ -1,0 +1,16 @@
+# VNC-Server fuer die labwc/Wayland-Sitzung des Kiosks.
+# Laeuft als --user-Service und teilt den realen Bildschirminhalt (das, was der
+# Kiosk anzeigt). Hoert nur lokal auf 127.0.0.1:5900 — nach aussen geht es
+# ausschliesslich ueber noVNC/Tailscale (siehe novnc.service).
+[Unit]
+Description=wayvnc (VNC-Server fuer labwc/Wayland)
+After=graphical-session.target
+
+[Service]
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStart=/usr/bin/wayvnc 127.0.0.1 5900
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

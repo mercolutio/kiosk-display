@@ -1,0 +1,20 @@
+# Browser-VNC (noVNC + websockify): macht den lokalen wayvnc (127.0.0.1:5900)
+# als Webseite erreichbar — aber NUR ueber das Tailscale-Netz (gebunden an die
+# Tailnet-IP des Geraets, nicht 0.0.0.0). So ist die Fernsteuerung nicht im
+# lokalen WLAN offen, sondern nur fuer dein Tailscale-Konto.
+#
+# Die Tailnet-IP wird beim Start dynamisch ermittelt (kein fest verdrahteter
+# Wert), damit dieselbe Datei auf jedem Geraet unveraendert funktioniert.
+[Unit]
+Description=noVNC (Browser-VNC) ueber Tailscale
+After=network-online.target
+
+[Service]
+# Warten, bis Tailscale eine IP hat (sonst kann websockify nicht binden).
+ExecStartPre=/bin/sh -c 'until /usr/bin/tailscale ip -4 >/dev/null 2>&1; do sleep 2; done'
+ExecStart=/bin/sh -c 'exec /usr/bin/websockify --web=/usr/share/novnc/ "$(/usr/bin/tailscale ip -4 | head -1)":6080 127.0.0.1:5900'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

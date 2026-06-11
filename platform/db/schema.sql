@@ -36,7 +36,7 @@ create index if not exists sites_device_pos on sites (device_id, position);
 create table if not exists commands (
   id          uuid primary key default gen_random_uuid(),
   device_id   uuid not null references devices(id) on delete cascade,
-  type        text not null check (type in ('restart_app', 'reboot', 'reload_config')),
+  type        text not null check (type in ('restart_app', 'stop_app', 'start_app', 'reboot', 'reload_config')),
   status      text not null default 'pending' check (status in ('pending', 'done', 'failed')),
   result      text,
   created_at  timestamptz not null default now(),

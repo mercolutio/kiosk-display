@@ -67,6 +67,22 @@ systemctl --user enable --now kiosk-agent.service
 systemctl --user enable --now kiosk.service
 
 echo ""
+echo "==> Live-Fernsteuerung (Tailscale + VNC)"
+SETUP_REMOTE="${KIOSK_REMOTE:-}"
+if [ -z "$SETUP_REMOTE" ]; then
+  read -rp "Jetzt einrichten (Bildschirm im Dashboard fernsteuern)? [J/n]: " ans
+  case "$ans" in [nN]*) SETUP_REMOTE=0 ;; *) SETUP_REMOTE=1 ;; esac
+fi
+if [ "$SETUP_REMOTE" = "1" ]; then
+  # Nicht-fatal: scheitert/abgebrochen -> Rest der Installation bleibt gueltig,
+  # spaeter nachholbar mit setup-remote.sh.
+  bash "$DIR/platform/agent/setup-remote.sh" \
+    || echo "   Fernsteuerung uebersprungen/fehlgeschlagen — spaeter: bash $DIR/platform/agent/setup-remote.sh"
+else
+  echo "   Uebersprungen. Spaeter nachholbar: bash $DIR/platform/agent/setup-remote.sh"
+fi
+
+echo ""
 echo "==> Fertig! Status:"
 systemctl --user --no-pager status kiosk-agent | head -4 || true
 echo ""
