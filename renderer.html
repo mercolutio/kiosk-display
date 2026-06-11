@@ -320,6 +320,8 @@
     let isPaused = false;
     let timerInterval = null;
     let interactionTimeout = null;
+    let pauseStartTime = 0;     // Beginn der aktuellen Interaktions-/Pause-Sitzung
+    let pauseSiteUrl = null;    // Seite, die dabei bedient wird
 
 
     function initDots() {
@@ -373,6 +375,7 @@
     }
 
     function resetTimer() {
+      endPauseSession();
       timeRemaining = getSiteDuration();
       isPaused = false;
       pauseIndicator.classList.remove('visible');
@@ -390,15 +393,28 @@
     function pauseTimer() {
       if (isPaused) return;
       isPaused = true;
+      pauseStartTime = Date.now();
+      try { pauseSiteUrl = config.sites[currentIndex].url; } catch (e) { pauseSiteUrl = null; }
       pauseIndicator.classList.add('visible');
       timerProgress.classList.add('paused');
+    }
 
+    // Interaktions-/Pause-Sitzung beenden und an den Hauptprozess melden
+    // (Haeufigkeit + Dauer fuer die Wiedergabe-Statistik).
+    function endPauseSession() {
+      if (!pauseStartTime) return;
+      const durationMs = Date.now() - pauseStartTime;
+      const url = pauseSiteUrl;
+      pauseStartTime = 0;
+      pauseSiteUrl = null;
+      if (url) { try { window.kiosk.reportInteraction(url, durationMs); } catch (e) {} }
     }
 
     function resumeAfterScroll() {
       clearTimeout(interactionTimeout);
       interactionTimeout = setTimeout(() => {
         isPaused = false;
+        endPauseSession();
         timeRemaining = config.rotationInterval;
         pauseIndicator.classList.remove('visible');
         timerProgress.classList.remove('paused');

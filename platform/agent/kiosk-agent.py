@@ -35,11 +35,14 @@ POLL_SECONDS = int(os.environ.get('KIOSK_POLL_SECONDS', '15'))
 OUTPUT = os.environ.get('KIOSK_OUTPUT', 'HDMI-A-1')
 CURRENT_SITE_FILE = os.environ.get('KIOSK_CURRENT_SITE_FILE',
                                    os.path.expanduser('~/.cache/kiosk-current-site'))
-AGENT_VERSION = '1.3'
+INTERACTIONS_FILE = os.environ.get('KIOSK_INTERACTIONS_FILE',
+                                   os.path.expanduser('~/.cache/kiosk-interactions.json'))
+AGENT_VERSION = '1.4'
 
 _screen_on = None         # zuletzt gesetzter Bildschirm-Zustand
 _pending_ack = []         # ausgefuehrte Befehle, beim naechsten Sync zu quittieren
 _pending_logs = []        # Ereignisse fuers Dashboard, beim naechsten Sync uebermittelt
+_prev_interactions = {}   # letzter Stand der kumulativen Interaktions-Zaehler (fuer Deltas)
 
 
 def log(msg, level='info'):
@@ -57,14 +60,47 @@ def read_current_site():
         return None
 
 
+def _read_interactions():
+    try:
+        with open(INTERACTIONS_FILE, 'r', encoding='utf-8') as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _interaction_deltas(cur):
+    """Differenz der kumulativen Interaktions-Zaehler zum letzten Stand bilden.
+    Ein Kiosk-Neustart setzt die Zaehler zurueck -> dann gilt der aktuelle Wert."""
+    deltas = []
+    for url, v in cur.items():
+        if not isinstance(v, dict):
+            continue
+        try:
+            c = int(v.get('count', 0))
+            m = int(v.get('ms', 0))
+        except (TypeError, ValueError):
+            continue
+        prev = _prev_interactions.get(url, {})
+        dc = c - int(prev.get('count', 0))
+        dm = m - int(prev.get('ms', 0))
+        if dc < 0 or dm < 0:   # Kiosk-Neustart -> Zaehler zurueckgesetzt
+            dc, dm = c, m
+        if dc > 0 or dm > 0:
+            deltas.append({'url': url, 'count': dc, 'ms': dm})
+    return deltas
+
+
 def sync(current_site):
     """Einen Sync-Zyklus durchfuehren; Antwort (dict) zurueckgeben."""
-    global _pending_ack, _pending_logs
+    global _pending_ack, _pending_logs, _prev_interactions
+    cur_interactions = _read_interactions()
     payload = {
         'agent_version': AGENT_VERSION,
         'current_site': current_site,
         'ack': _pending_ack,
         'logs': _pending_logs,
+        'interactions': _interaction_deltas(cur_interactions),
     }
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(API_URL + '/api/agent/sync', data=data, method='POST')
@@ -74,6 +110,7 @@ def sync(current_site):
         result = json.loads(resp.read().decode('utf-8'))
     _pending_ack = []   # erfolgreich uebermittelt
     _pending_logs = []
+    _prev_interactions = cur_interactions   # erst nach erfolgreichem Sync uebernehmen
     return result
 
 
@@ -172,9 +209,13 @@ def apply_schedule(config):
 
 
 def main():
+    global _prev_interactions
     if not API_URL or not TOKEN:
         log('FEHLER: KIOSK_API_URL und KIOSK_DEVICE_TOKEN muessen gesetzt sein.', 'error')
         sys.exit(1)
+    # Basis setzen: nur kuenftige Interaktionen zaehlen (verhindert Doppelzaehlung
+    # nach einem Agent-Neustart, da die Zaehler-Datei kumulativ ist).
+    _prev_interactions = _read_interactions()
     log('Agent gestartet (v%s), Poll alle %ss' % (AGENT_VERSION, POLL_SECONDS))
     sync_count = 0
     while True:

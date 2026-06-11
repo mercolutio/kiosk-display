@@ -70,6 +70,29 @@ export async function POST(req: Request) {
     }
   }
 
+  // Interaktions-Statistik (Timer-Stopps durch Bedienung): Deltas vom Agent den
+  // konfigurierten Seiten gutschreiben (Haeufigkeit + Gesamtdauer).
+  if (Array.isArray(body.interactions)) {
+    for (const it of body.interactions) {
+      if (!it || typeof it.url !== 'string') continue;
+      const count = Number.isFinite(it.count) ? Math.max(0, Math.round(it.count)) : 0;
+      const pauseSec = Number.isFinite(it.ms) ? Math.max(0, Math.round(it.ms / 1000)) : 0;
+      if (count === 0 && pauseSec === 0) continue;
+      try {
+        await sql`
+          insert into site_stats (device_id, url, day, pauses, pause_seconds)
+          select ${device.id}, ${it.url}, current_date, ${count}, ${pauseSec}
+           where exists (select 1 from sites where device_id = ${device.id} and url = ${it.url})
+          on conflict (device_id, url, day) do update
+            set pauses = site_stats.pauses + ${count},
+                pause_seconds = site_stats.pause_seconds + ${pauseSec}
+        `;
+      } catch {
+        /* Spalten pauses/pause_seconds evtl. noch nicht migriert -> ignorieren */
+      }
+    }
+  }
+
   // Vom Agent ausgefuehrte Befehle quittieren.
   if (Array.isArray(body.ack)) {
     for (const a of body.ack) {

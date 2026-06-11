@@ -8,6 +8,19 @@ const os = require('os');
 const CURRENT_SITE_FILE = path.join(os.homedir(), '.cache', 'kiosk-current-site');
 try { fs.mkdirSync(path.dirname(CURRENT_SITE_FILE), { recursive: true }); } catch (e) {}
 
+// Kumulative Interaktions-Zaehler je Seite (Haeufigkeit + Dauer der Timer-Stopps,
+// d. h. wie oft/lange eine Seite bedient wurde). Der Agent liest die Datei, bildet
+// die Differenz und meldet sie ans Dashboard (Wiedergabe-Statistik).
+const INTERACTIONS_FILE = path.join(os.homedir(), '.cache', 'kiosk-interactions.json');
+const interactions = {};
+function writeInteractions() {
+  try {
+    const tmp = INTERACTIONS_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(interactions));
+    fs.renameSync(tmp, INTERACTIONS_FILE);  // atomar, damit der Agent nie halb liest
+  } catch (e) {}
+}
+
 // Raspberry Pi Performance + Touch
 app.commandLine.appendSwitch('touch-events', 'enabled');
 app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform');
@@ -63,6 +76,19 @@ ipcMain.handle('reload-config', () => {
 // Aktuell angezeigte Seite protokollieren (vom Renderer bei jedem Seitenwechsel).
 ipcMain.on('current-site', (_event, url) => {
   fs.writeFile(CURRENT_SITE_FILE, String(url || ''), () => {});
+});
+
+// Interaktion melden: jemand hat die angezeigte Seite bedient (Timer gestoppt).
+// Zaehler + Dauer je Seite hochzaehlen.
+ipcMain.on('interaction', (_event, data) => {
+  const url = data && data.url;
+  if (!url) return;
+  const ms = Math.max(0, Math.round((data && data.ms) || 0));
+  const it = interactions[url] || { count: 0, ms: 0 };
+  it.count += 1;
+  it.ms += ms;
+  interactions[url] = it;
+  writeInteractions();
 });
 
 // Notausstieg: Strg+Shift+Q beendet den Kiosk — egal ob der Fokus auf der Seite
