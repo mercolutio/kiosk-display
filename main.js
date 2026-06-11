@@ -1,6 +1,12 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+
+// Datei, in die die aktuell angezeigte Seite geschrieben wird; der Kiosk-Agent
+// liest sie und meldet sie ans Dashboard (fuer die Wiedergabe-Statistik).
+const CURRENT_SITE_FILE = path.join(os.homedir(), '.cache', 'kiosk-current-site');
+try { fs.mkdirSync(path.dirname(CURRENT_SITE_FILE), { recursive: true }); } catch (e) {}
 
 // Raspberry Pi Performance + Touch
 app.commandLine.appendSwitch('touch-events', 'enabled');
@@ -46,6 +52,11 @@ function createWindow() {
 // Config neu laden wenn angefragt
 ipcMain.handle('reload-config', () => {
   return loadConfig();
+});
+
+// Aktuell angezeigte Seite protokollieren (vom Renderer bei jedem Seitenwechsel).
+ipcMain.on('current-site', (_event, url) => {
+  fs.writeFile(CURRENT_SITE_FILE, String(url || ''), () => {});
 });
 
 // Notausstieg: Strg+Shift+Q beendet den Kiosk — egal ob der Fokus auf der Seite
