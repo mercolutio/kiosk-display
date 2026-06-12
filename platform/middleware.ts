@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken, SESSION_COOKIE } from '@/lib/auth';
 
-// Schuetzt alle Seiten ausser /login. Die Agent-API (/api/agent/*) ist per
-// Matcher ausgenommen und sichert sich selbst ueber das Geraete-Token.
+// Schuetzt alle Seiten ausser /login. Die Agent-API (/api/agent/*) sichert sich
+// per Geraete-Token; die Cron-Routen (/api/cron/*) per CRON_SECRET; der Blob-
+// Upload (/api/upload) prueft die Session selbst — daher per Matcher ausgenommen.
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (pathname.startsWith('/login')) return NextResponse.next();
@@ -17,5 +18,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/agent).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/agent|api/cron|api/upload).*)'],
 };

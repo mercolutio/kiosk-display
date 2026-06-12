@@ -25,7 +25,8 @@ create table if not exists sites (
   id          uuid primary key default gen_random_uuid(),
   device_id   uuid not null references devices(id) on delete cascade,
   name        text not null,
-  url         text not null,
+  url         text not null,                        -- Web-URL ODER Medien-URL (Bild/Video, in Vercel Blob)
+  type        text not null default 'web' check (type in ('web', 'image', 'video')),
   duration    int,                                 -- optionale Anzeigedauer; NULL => rotation_interval
   position    int  not null default 0,             -- Reihenfolge
   enabled     boolean not null default true,

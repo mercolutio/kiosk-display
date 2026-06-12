@@ -290,6 +290,8 @@
 
   <div id="webviewContainer">
     <webview id="webview" src="about:blank" nodeintegration useragent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"></webview>
+    <img id="mediaImg" style="display:none; width:100%; height:100%; object-fit:contain; background:#000;" />
+    <video id="mediaVid" style="display:none; width:100%; height:100%; object-fit:contain; background:#000;" muted loop playsinline></video>
   </div>
 
   <div id="keyboard">
@@ -306,6 +308,8 @@
     const path = require('path');
     webview.setAttribute('preload', 'file://' + path.join(__dirname, 'webview-preload.js'));
     const webviewContainer = document.getElementById('webviewContainer');
+    const mediaImg = document.getElementById('mediaImg');
+    const mediaVid = document.getElementById('mediaVid');
     const siteName = document.getElementById('siteName');
     const timerProgress = document.getElementById('timerProgress');
     const timerText = document.getElementById('timerText');
@@ -354,14 +358,37 @@
       });
     }
 
+    // Zwischen Webview / Bild / Video umschalten (jeweils nur eins sichtbar).
+    function showMedia(kind) {
+      webview.style.display = kind === 'web' ? '' : 'none';
+      mediaImg.style.display = kind === 'image' ? '' : 'none';
+      mediaVid.style.display = kind === 'video' ? '' : 'none';
+      if (kind !== 'video') { try { mediaVid.pause(); } catch (e) {} }
+    }
+
     function loadSite(index) {
       const site = config.sites[index];
-      try { siteName.textContent = new URL(site.url).hostname; } catch { siteName.textContent = site.name; }
-      loadingScreen.classList.remove('hidden');
-      webview.src = site.url;
+      const type = site.type || 'web';
       updateDots();
       resetTimer();
       try { window.kiosk.reportSite(site.url); } catch (e) {}
+      if (type === 'image') {
+        siteName.textContent = site.name || 'Bild';
+        showMedia('image');
+        mediaImg.src = site.url;
+        loadingScreen.classList.add('hidden');
+      } else if (type === 'video') {
+        siteName.textContent = site.name || 'Video';
+        showMedia('video');
+        if (mediaVid.getAttribute('src') !== site.url) mediaVid.src = site.url;
+        try { mediaVid.currentTime = 0; const p = mediaVid.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+        loadingScreen.classList.add('hidden');
+      } else {
+        try { siteName.textContent = new URL(site.url).hostname; } catch (e) { siteName.textContent = site.name; }
+        showMedia('web');
+        loadingScreen.classList.remove('hidden');
+        webview.src = site.url;
+      }
     }
 
     function nextSite() {

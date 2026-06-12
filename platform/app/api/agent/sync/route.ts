@@ -135,14 +135,25 @@ export async function POST(req: Request) {
   }
 
   // Aktuelle Seiten-Config zusammenstellen (nur aktivierte, in Reihenfolge).
-  const { rows: siteRows } = await sql`
-    select name, url, duration from sites
-     where device_id = ${device.id} and enabled = true
-     order by position asc, created_at asc
-  `;
+  // type wird resilient gelesen (Fallback ohne Spalte, falls noch nicht migriert).
+  let siteRows: any[] = [];
+  try {
+    const r = await sql`
+      select name, url, duration, type from sites
+       where device_id = ${device.id} and enabled = true
+       order by position asc, created_at asc`;
+    siteRows = r.rows;
+  } catch {
+    const r = await sql`
+      select name, url, duration from sites
+       where device_id = ${device.id} and enabled = true
+       order by position asc, created_at asc`;
+    siteRows = r.rows;
+  }
   const sites = siteRows.map((s: any) => {
     const entry: any = { url: s.url, name: s.name };
     if (s.duration != null) entry.duration = s.duration;
+    if (s.type && s.type !== 'web') entry.type = s.type;  // nur bei Bild/Video mitschicken
     return entry;
   });
 
