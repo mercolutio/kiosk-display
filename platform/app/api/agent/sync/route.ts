@@ -8,6 +8,7 @@
 //                        screenOffTime, sites: [{url,name,duration?}] },
 //     commands: [{ id, type }] }
 import { sql } from '@/lib/db';
+import { handleRecovery, checkOfflineAndAlert } from '@/lib/alerts';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -43,6 +44,12 @@ export async function POST(req: Request) {
        set last_seen_at = now(), current_site = ${currentSite}, agent_version = ${agentVersion}
      where id = ${device.id}
   `;
+
+  // Offline-Alarm: dieses Geraet ist gerade online -> falls es zuvor als offline
+  // gemeldet war, "wieder online" senden; danach die Flotte auf neu offline
+  // gegangene Geraete pruefen (beide Schritte fehlertolerant).
+  await handleRecovery(device.id);
+  await checkOfflineAndAlert();
 
   // Wiedergabe-Statistik: die seit dem letzten Heartbeat vergangene Zeit der
   // aktuell gemeldeten Seite gutschreiben (Sampling). Lange Luecken (offline)

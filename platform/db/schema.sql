@@ -16,6 +16,7 @@ create table if not exists devices (
   current_site     text,                           -- vom Agent gemeldete aktuelle Seite
   agent_version    text,
   remote_url       text,                           -- Live-Fernsteuerung (VNC/noVNC im Browser)
+  offline_alerted_at timestamptz,                   -- gesetzt, solange ein Offline-Alarm fuer dieses Geraet aktiv ist
   created_at       timestamptz not null default now()
 );
 
