@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { sql } from '@/lib/db';
 import {
   updateDeviceSettings, deleteDevice,
-  addSite, updateSite, deleteSite, moveSite,
+  updateSite, deleteSite, moveSite,
   enqueueCommand,
 } from '../../actions';
 import AutoRefresh from '../../auto-refresh';
+import AddSiteForm from './AddSiteForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -205,6 +206,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             <form action={updateSite} className="row" style={{ flex: 1 }}>
               <input type="hidden" name="id" value={s.id} />
               <input type="hidden" name="device_id" value={id} />
+              <input type="hidden" name="type" value={s.type || 'web'} />
               <input name="name" defaultValue={s.name} placeholder="Name" style={{ width: 150 }} />
               <input name="url" defaultValue={s.url} placeholder="https://…" style={{ flex: 1, minWidth: 180 }} />
               <input name="duration" type="number" min="1" defaultValue={s.duration ?? ''} placeholder="Dauer s" style={{ width: 90 }} />
@@ -230,13 +232,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             </form>
           </div>
         ))}
-        <form action={addSite} className="row" style={{ marginTop: 6 }}>
-          <input type="hidden" name="device_id" value={id} />
-          <input name="name" placeholder="Name" required style={{ width: 150 }} />
-          <input name="url" placeholder="https://…" required style={{ flex: 1, minWidth: 180 }} />
-          <input name="duration" type="number" min="1" placeholder="Dauer s" style={{ width: 90 }} />
-          <button className="btn-primary btn-sm" type="submit">+ Seite</button>
-        </form>
+        <AddSiteForm deviceId={id} />
       </div>
 
       {/* Einstellungen */}

@@ -75,16 +75,21 @@ export async function addSite(formData: FormData) {
   const deviceId = String(formData.get('device_id') || '');
   const name = String(formData.get('name') || '').trim();
   const url = String(formData.get('url') || '').trim();
+  const typeRaw = String(formData.get('type') || 'web').trim();
+  const type = ['web', 'image', 'video'].includes(typeRaw) ? typeRaw : 'web';
   const durationRaw = String(formData.get('duration') || '').trim();
   const duration = durationRaw ? parseInt(durationRaw, 10) : null;
   if (deviceId && name && url) {
     const { rows } = await sql`
       select coalesce(max(position), -1) + 1 as pos from sites where device_id = ${deviceId}
     `;
-    await sql`
+    const { rows: ins } = await sql`
       insert into sites (device_id, name, url, duration, position)
       values (${deviceId}, ${name}, ${url}, ${duration}, ${rows[0].pos})
+      returning id
     `;
+    // Typ separat setzen -> bricht nicht, falls die Spalte type noch nicht migriert ist.
+    try { await sql`update sites set type = ${type} where id = ${ins[0].id}`; } catch {}
   }
   revalidatePath(`/devices/${deviceId}`);
 }
@@ -97,10 +102,13 @@ export async function updateSite(formData: FormData) {
   const durationRaw = String(formData.get('duration') || '').trim();
   const duration = durationRaw ? parseInt(durationRaw, 10) : null;
   const enabled = formData.get('enabled') != null;
+  const typeRaw = String(formData.get('type') || '').trim();
+  const type = ['web', 'image', 'video'].includes(typeRaw) ? typeRaw : '';
   await sql`
     update sites set name = ${name}, url = ${url}, duration = ${duration}, enabled = ${enabled}
      where id = ${id}
   `;
+  if (type) { try { await sql`update sites set type = ${type} where id = ${id}`; } catch {} }
   revalidatePath(`/devices/${deviceId}`);
 }
 
