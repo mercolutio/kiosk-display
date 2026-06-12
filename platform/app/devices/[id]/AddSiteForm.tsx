@@ -10,8 +10,9 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
   const [mediaUrl, setMediaUrl] = useState('');
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState(0);
 
-  function reset() { setMediaUrl(''); setFileName(''); setError(''); }
+  function reset() { setMediaUrl(''); setFileName(''); setError(''); setProgress(0); }
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -19,7 +20,12 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
     reset();
     setUploading(true);
     try {
-      const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/upload' });
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload',
+        multipart: true,
+        onUploadProgress: (p) => setProgress(Math.round(p.percentage)),
+      });
       setMediaUrl(blob.url);
       setFileName(file.name);
     } catch (err: any) {
@@ -45,7 +51,7 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
         <div style={{ flex: 1, minWidth: 160 }}>
           <input type="file" accept={type === 'image' ? 'image/*' : 'video/*'} onChange={onFile} />
           <input type="hidden" name="url" value={mediaUrl} />
-          {uploading && <span className="muted" style={{ marginLeft: 8 }}>lädt hoch…</span>}
+          {uploading && <span className="muted" style={{ marginLeft: 8 }}>lädt hoch… {progress}%</span>}
           {mediaUrl && <span style={{ marginLeft: 8, color: '#34c759', fontSize: 13 }}>✓ {fileName}</span>}
           {error && <div className="error" style={{ marginTop: 4 }}>{error}</div>}
         </div>
