@@ -16,18 +16,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     const json = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async () => {
+      onBeforeGenerateToken: async (pathname) => {
         const session = (await cookies()).get(SESSION_COOKIE)?.value;
         if (!(await verifyToken(session))) throw new Error('nicht angemeldet');
+        console.log('[upload] Token angefragt:', pathname);
         return {
           allowedContentTypes: [
             'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
             'video/mp4', 'video/webm', 'video/ogg',
           ],
+          addRandomSuffix: true,                 // eindeutige Pfade -> kein Konflikt bei gleichem Dateinamen
           maximumSizeInBytes: 100 * 1024 * 1024, // 100 MB
         };
       },
-      onUploadCompleted: async () => { /* nichts noetig: Client bekommt die URL direkt */ },
+      onUploadCompleted: async ({ blob }) => { console.log('[upload] fertig:', blob.url); },
     });
     return NextResponse.json(json);
   } catch (e) {
