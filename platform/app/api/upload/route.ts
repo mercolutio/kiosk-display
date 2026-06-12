@@ -31,6 +31,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
     return NextResponse.json(json);
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    const msg = (e as Error).message;
+    console.error('[upload] Fehler:', msg);
+    const hint = /token|BLOB_READ_WRITE_TOKEN/i.test(msg)
+      ? 'Blob-Store nicht mit dem Projekt verbunden? BLOB_READ_WRITE_TOKEN fehlt.'
+      : undefined;
+    return NextResponse.json({ error: msg, hint }, { status: 400 });
   }
 }
