@@ -90,9 +90,16 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
       <AutoRefresh seconds={10} />
       <div className="header">
         <h1><Link href="/">← Geräte</Link> / {device.name}</h1>
-        <span className={isOnline(device.last_seen_at) ? 'badge-online' : 'badge-offline'}>
-          {isOnline(device.last_seen_at) ? '● online' : '● offline'}
-        </span>
+        <div className="row" style={{ gap: 8 }}>
+          <span className={isOnline(device.last_seen_at) ? 'badge-online' : 'badge-offline'}>
+            {isOnline(device.last_seen_at) ? '● online' : '● offline'}
+          </span>
+          {isOnline(device.last_seen_at) && device.app_active != null && (
+            <span style={{ color: device.app_active ? '#34c759' : '#ffd27a' }}>
+              {device.app_active ? '● App an' : '● App aus'}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Fernsteuerung */}

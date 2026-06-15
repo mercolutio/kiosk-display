@@ -37,7 +37,8 @@ CURRENT_SITE_FILE = os.environ.get('KIOSK_CURRENT_SITE_FILE',
                                    os.path.expanduser('~/.cache/kiosk-current-site'))
 INTERACTIONS_FILE = os.environ.get('KIOSK_INTERACTIONS_FILE',
                                    os.path.expanduser('~/.cache/kiosk-interactions.json'))
-AGENT_VERSION = '1.4'
+APP_SERVICE = os.environ.get('KIOSK_APP_SERVICE', 'kiosk')   # systemd-Dienst der Kiosk-App
+AGENT_VERSION = '1.5'
 
 _screen_on = None         # zuletzt gesetzter Bildschirm-Zustand
 _pending_ack = []         # ausgefuehrte Befehle, beim naechsten Sync zu quittieren
@@ -57,6 +58,17 @@ def read_current_site():
         with open(CURRENT_SITE_FILE, 'r', encoding='utf-8') as fh:
             return fh.read().strip() or None
     except OSError:
+        return None
+
+
+def kiosk_app_active():
+    """True/False, ob der Kiosk-Dienst laeuft (fuer den App-Status im Dashboard);
+    None, falls nicht ermittelbar."""
+    try:
+        r = subprocess.run(['systemctl', '--user', 'is-active', APP_SERVICE],
+                           capture_output=True, text=True, timeout=5)
+        return r.stdout.strip() == 'active'
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -98,6 +110,7 @@ def sync(current_site):
     payload = {
         'agent_version': AGENT_VERSION,
         'current_site': current_site,
+        'app_active': kiosk_app_active(),
         'ack': _pending_ack,
         'logs': _pending_logs,
         'interactions': _interaction_deltas(cur_interactions),

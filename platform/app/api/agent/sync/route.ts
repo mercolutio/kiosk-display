@@ -39,11 +39,14 @@ export async function POST(req: Request) {
   // Heartbeat aktualisieren.
   const currentSite = typeof body.current_site === 'string' ? body.current_site : null;
   const agentVersion = typeof body.agent_version === 'string' ? body.agent_version : null;
+  const appActive = typeof body.app_active === 'boolean' ? body.app_active : null;
   await sql`
     update devices
        set last_seen_at = now(), current_site = ${currentSite}, agent_version = ${agentVersion}
      where id = ${device.id}
   `;
+  // App-Status separat -> bricht den Heartbeat nicht, falls die Spalte noch fehlt.
+  try { await sql`update devices set app_active = ${appActive} where id = ${device.id}`; } catch {}
 
   // Offline-Alarm: dieses Geraet ist gerade online -> falls es zuvor als offline
   // gemeldet war, "wieder online" senden; danach die Flotte auf neu offline
