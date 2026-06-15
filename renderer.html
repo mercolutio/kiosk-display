@@ -207,7 +207,7 @@
       to { transform: rotate(360deg); }
     }
 
-    /* On-Screen Keyboard */
+    /* On-Screen Keyboard — fuer 14" Querformat: grosse, griffige Tasten, zentriert */
     #keyboard {
       position: fixed;
       bottom: 0;
@@ -215,11 +215,12 @@
       right: 0;
       background: #111;
       border-top: 1px solid rgba(200, 255, 0, 0.2);
-      padding: 12px 10px 16px;
+      padding: 16px 16px 22px;
       z-index: 2000;
       display: none;
       flex-direction: column;
-      gap: 8px;
+      align-items: center;
+      gap: 10px;
       transition: transform 0.25s ease;
     }
 
@@ -230,26 +231,26 @@
     .kb-row {
       display: flex;
       justify-content: center;
-      gap: 6px;
+      gap: 8px;
     }
 
     .kb-key {
       font-family: 'Space Mono', monospace;
-      font-size: 14px;
+      font-size: 21px;
       font-weight: 700;
       color: #fff;
       background: #1e1e1e;
       border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px;
-      min-width: 44px;
-      height: 44px;
+      border-radius: 10px;
+      min-width: 72px;
+      height: 58px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       user-select: none;
       transition: background 0.1s, transform 0.1s;
-      padding: 0 8px;
+      padding: 0 10px;
     }
 
     .kb-key:active, .kb-key.pressed {
@@ -258,8 +259,8 @@
       transform: scale(0.93);
     }
 
-    .kb-key.wide { min-width: 70px; }
-    .kb-key.space { min-width: 200px; color: rgba(255,255,255,0.3); font-size: 10px; letter-spacing: 2px; }
+    .kb-key.wide { min-width: 108px; }
+    .kb-key.space { min-width: 400px; color: rgba(255,255,255,0.3); font-size: 12px; letter-spacing: 2px; }
     .kb-key.action { background: rgba(200,255,0,0.12); color: #c8ff00; border-color: rgba(200,255,0,0.2); }
     .kb-key.action:active { background: #c8ff00; color: #0a0a0a; }
     .kb-key.shift-active { background: rgba(200,255,0,0.2); color: #c8ff00; }
