@@ -1,8 +1,10 @@
-// Datei-Upload (Bilder/Videos) nach Vercel Blob — Client-Upload-Flow, damit
-// auch groessere Videos nicht am 4,5-MB-Limit der Serverless-Funktion scheitern.
-// Per Matcher aus der Auth-Middleware ausgenommen; die Session wird hier selbst
-// geprueft (nur eingeloggte Admins duerfen Tokens erzeugen).
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+// Server-seitiger Upload nach Vercel Blob: der Browser schickt die Datei als
+// Roh-Body an diese Route, der Server legt sie im Blob-Store ab (put). Vorteil
+// ggü. dem Client-Upload: funktioniert auch in Netzen, die den direkten
+// Browser->Blob-Transfer blockieren — ohne CORS, ohne Client-Token.
+// Limit ~4,5 MB pro Datei (Vercel-Function-Body); Bilder werden im Browser
+// vorab auf Display-Groesse verkleinert, Videos clientseitig vor dem Senden geprueft.
+import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken, SESSION_COOKIE } from '@/lib/auth';
@@ -10,34 +12,24 @@ import { verifyToken, SESSION_COOKIE } from '@/lib/auth';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request): Promise<NextResponse> {
-  const body = (await request.json()) as HandleUploadBody;
+export async function POST(request: Request) {
+  const session = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!(await verifyToken(session))) {
+    return NextResponse.json({ error: 'nicht angemeldet' }, { status: 401 });
+  }
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json({ error: 'BLOB_READ_WRITE_TOKEN fehlt' }, { status: 500 });
+  }
+  const filename = new URL(request.url).searchParams.get('filename') || 'upload';
+  const contentType = request.headers.get('content-type') || 'application/octet-stream';
   try {
-    const json = await handleUpload({
-      body,
-      request,
-      onBeforeGenerateToken: async (pathname) => {
-        const session = (await cookies()).get(SESSION_COOKIE)?.value;
-        if (!(await verifyToken(session))) throw new Error('nicht angemeldet');
-        console.log('[upload] Token angefragt:', pathname);
-        return {
-          allowedContentTypes: [
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-            'video/mp4', 'video/webm', 'video/ogg',
-          ],
-          addRandomSuffix: true,                 // eindeutige Pfade -> kein Konflikt bei gleichem Dateinamen
-          maximumSizeInBytes: 100 * 1024 * 1024, // 100 MB
-        };
-      },
-      onUploadCompleted: async ({ blob }) => { console.log('[upload] fertig:', blob.url); },
-    });
-    return NextResponse.json(json);
+    const buf = Buffer.from(await request.arrayBuffer());
+    if (buf.length === 0) return NextResponse.json({ error: 'leere Datei' }, { status: 400 });
+    const blob = await put(filename, buf, { access: 'public', addRandomSuffix: true, contentType });
+    console.log('[upload] gespeichert:', blob.url, '(' + buf.length + ' bytes)');
+    return NextResponse.json({ url: blob.url });
   } catch (e) {
-    const msg = (e as Error).message;
-    console.error('[upload] Fehler:', msg);
-    const hint = /token|BLOB_READ_WRITE_TOKEN/i.test(msg)
-      ? 'Blob-Store nicht mit dem Projekt verbunden? BLOB_READ_WRITE_TOKEN fehlt.'
-      : undefined;
-    return NextResponse.json({ error: msg, hint }, { status: 400 });
+    console.error('[upload] Fehler:', (e as Error).message);
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }
