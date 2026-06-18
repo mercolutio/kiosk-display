@@ -1,9 +1,70 @@
 'use client';
 import { useState, type ChangeEvent } from 'react';
-import { upload } from '@vercel/blob/client';
 import { addSite } from '../../actions';
 
-// Seite hinzufuegen: Webseite (URL) ODER Bild/Video (Datei -> Vercel Blob).
+const MAX_DIRECT = 4.4 * 1024 * 1024; // ~Vercel-Function-Body-Limit (4,5 MB)
+
+// Bild im Browser auf max. 1920 px (JPEG) verkleinern -> passt fuers Display und
+// bleibt klar unter dem Upload-Limit.
+function resizeImage(file: File, maxDim = 1920): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (Math.max(width, height) > maxDim) {
+          const s = maxDim / Math.max(width, height);
+          width = Math.round(width * s);
+          height = Math.round(height * s);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas nicht verfügbar'));
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error('Bild konnte nicht konvertiert werden'))),
+          'image/jpeg',
+          0.85,
+        );
+      };
+      img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Datei serverseitig hochladen (POST an /api/upload) mit Fortschritt via XHR.
+function uploadViaXhr(body: Blob, filename: string, onProgress: (p: number) => void): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/upload?filename=${encodeURIComponent(filename)}`);
+    xhr.setRequestHeader('Content-Type', body.type || 'application/octet-stream');
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) onProgress(Math.round((ev.loaded / ev.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText).url); }
+        catch { reject(new Error('ungültige Server-Antwort')); }
+      } else if (xhr.status === 413) {
+        reject(new Error('Datei zu groß (max ~4,5 MB)'));
+      } else {
+        let msg = 'Fehler ' + xhr.status;
+        try { msg = JSON.parse(xhr.responseText).error || msg; } catch {}
+        reject(new Error(msg));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Netzwerkfehler beim Upload'));
+    xhr.send(body);
+  });
+}
+
+// Seite hinzufuegen: Webseite (URL) ODER Bild/Video (Datei -> Server -> Vercel Blob).
 export default function AddSiteForm({ deviceId }: { deviceId: string }) {
   const [type, setType] = useState<'web' | 'image' | 'video'>('web');
   const [uploading, setUploading] = useState(false);
@@ -20,12 +81,16 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
     reset();
     setUploading(true);
     try {
-      const blob = await upload(file.name, file, {
-        access: 'public',
-        handleUploadUrl: '/api/upload',
-        onUploadProgress: (p) => setProgress(Math.round(p.percentage)),
-      });
-      setMediaUrl(blob.url);
+      let body: Blob = file;
+      let name = file.name;
+      if (type === 'image') {
+        body = await resizeImage(file);
+        name = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+      } else if (body.size > MAX_DIRECT) {
+        throw new Error('Video zu groß (max ~4,5 MB). Bitte kürzer/kleiner komprimieren.');
+      }
+      const url = await uploadViaXhr(body, name, setProgress);
+      setMediaUrl(url);
       setFileName(file.name);
     } catch (err: any) {
       setError(err?.message || 'Upload fehlgeschlagen');
