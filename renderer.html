@@ -376,14 +376,19 @@
       if (type === 'image') {
         siteName.textContent = site.name || 'Bild';
         showMedia('image');
+        loadingScreen.classList.remove('hidden');
+        mediaImg.onload = () => loadingScreen.classList.add('hidden');
+        mediaImg.onerror = () => loadingScreen.classList.add('hidden');
         mediaImg.src = site.url;
-        loadingScreen.classList.add('hidden');
+        if (mediaImg.complete) loadingScreen.classList.add('hidden');   // schon im Cache -> sofort
       } else if (type === 'video') {
         siteName.textContent = site.name || 'Video';
         showMedia('video');
+        loadingScreen.classList.remove('hidden');
+        mediaVid.oncanplay = () => loadingScreen.classList.add('hidden');
         if (mediaVid.getAttribute('src') !== site.url) mediaVid.src = site.url;
         try { mediaVid.currentTime = 0; const p = mediaVid.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
-        loadingScreen.classList.add('hidden');
+        if (mediaVid.readyState >= 3) loadingScreen.classList.add('hidden');
       } else {
         try { siteName.textContent = new URL(site.url).hostname; } catch (e) { siteName.textContent = site.name; }
         showMedia('web');
@@ -660,6 +665,19 @@
 
     // Startet die Rotation erst, sobald Internet verfuegbar ist. Offline bleibt ein
     // Warte-Hinweis stehen — keine kaputten Seiten, keine Neustart-Schleife.
+    // Bilder vorab in den Cache laden, damit sie beim Anzeigen sofort da sind
+    // (kein langes Nachladen aus dem Netz mehr).
+    function preloadMedia(cfg) {
+      try {
+        (cfg.sites || []).forEach((s) => {
+          if ((s.type || 'web') === 'image' && s.url) {
+            const im = new Image();
+            im.src = s.url;
+          }
+        });
+      } catch (e) {}
+    }
+
     async function startWhenOnline() {
       while (!(await hasInternet())) {
         siteName.textContent = 'Warte auf Netzwerkverbindung…';
@@ -667,6 +685,7 @@
         await new Promise((r) => setTimeout(r, 5000));
       }
       loadingScreen.classList.add('hidden');
+      preloadMedia(config);
       initDots();
       loadSite(0);
       startTimerLoop();
