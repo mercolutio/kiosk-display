@@ -6,35 +6,45 @@ const MAX_DIRECT = 4.4 * 1024 * 1024; // ~Vercel-Function-Body-Limit (4,5 MB)
 
 // Bild im Browser auf max. 1920 px (JPEG) verkleinern -> passt fuers Display und
 // bleibt klar unter dem Upload-Limit.
+// Bildquelle schnell dekodieren: createImageBitmap (effizient, ohne Base64,
+// dekodiert die Datei direkt); Fallback ueber Object-URL fuer exotische Faelle.
+async function decodeImage(file: File): Promise<ImageBitmap | HTMLImageElement> {
+  if (typeof createImageBitmap === 'function') {
+    try { return await createImageBitmap(file); } catch { /* Fallback unten */ }
+  }
+  return await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Bild konnte nicht geladen werden')); };
+    img.src = url;
+  });
+}
+
 function resizeImage(file: File, maxDim = 1920): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (Math.max(width, height) > maxDim) {
-          const s = maxDim / Math.max(width, height);
-          width = Math.round(width * s);
-          height = Math.round(height * s);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return reject(new Error('Canvas nicht verfügbar'));
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error('Bild konnte nicht konvertiert werden'))),
-          'image/jpeg',
-          0.85,
-        );
-      };
-      img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
-      img.src = reader.result as string;
-    };
-    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
-    reader.readAsDataURL(file);
+  return decodeImage(file).then((src) => {
+    let width = (src as ImageBitmap).width;
+    let height = (src as ImageBitmap).height;
+    if (Math.max(width, height) > maxDim) {
+      const s = maxDim / Math.max(width, height);
+      width = Math.round(width * s);
+      height = Math.round(height * s);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas nicht verfügbar');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src as CanvasImageSource, 0, 0, width, height);
+    if ('close' in src) (src as ImageBitmap).close();
+    return new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error('Bild konnte nicht konvertiert werden'))),
+        'image/jpeg',
+        0.85,
+      ),
+    );
   });
 }
 
@@ -72,8 +82,9 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
   const [progress, setProgress] = useState(0);
+  const [processing, setProcessing] = useState(false);
 
-  function reset() { setMediaUrl(''); setFileName(''); setError(''); setProgress(0); }
+  function reset() { setMediaUrl(''); setFileName(''); setError(''); setProgress(0); setProcessing(false); }
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -84,7 +95,9 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
       let body: Blob = file;
       let name = file.name;
       if (type === 'image') {
+        setProcessing(true);
         body = await resizeImage(file);
+        setProcessing(false);
         name = file.name.replace(/\.[^.]+$/, '') + '.jpg';
       } else if (body.size > MAX_DIRECT) {
         throw new Error('Video zu groß (max ~4,5 MB). Bitte kürzer/kleiner komprimieren.');
@@ -96,6 +109,7 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
       setError(err?.message || 'Upload fehlgeschlagen');
     } finally {
       setUploading(false);
+      setProcessing(false);
     }
   }
 
@@ -115,7 +129,7 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
         <div style={{ flex: 1, minWidth: 160 }}>
           <input type="file" accept={type === 'image' ? 'image/*' : 'video/*'} onChange={onFile} />
           <input type="hidden" name="url" value={mediaUrl} />
-          {uploading && <span className="muted" style={{ marginLeft: 8 }}>lädt hoch… {progress}%</span>}
+          {uploading && <span className="muted" style={{ marginLeft: 8 }}>{processing ? 'verarbeite Bild…' : `lädt hoch… ${progress}%`}</span>}
           {mediaUrl && <span style={{ marginLeft: 8, color: '#34c759', fontSize: 13 }}>✓ {fileName}</span>}
           {error && <div className="error" style={{ marginTop: 4 }}>{error}</div>}
         </div>
