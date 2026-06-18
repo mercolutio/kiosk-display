@@ -23,7 +23,6 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
       const blob = await upload(file.name, file, {
         access: 'public',
         handleUploadUrl: '/api/upload',
-        multipart: true,
         onUploadProgress: (p) => setProgress(Math.round(p.percentage)),
       });
       setMediaUrl(blob.url);
