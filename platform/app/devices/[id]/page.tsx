@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { sql, ensureSchema } from '@/lib/db';
+import { backfillGeocodes } from '@/lib/geo';
 import {
   updateDeviceSettings, deleteDevice,
   updateSite, deleteSite, moveSite,
@@ -35,6 +36,8 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
   const { rows: devices } = await sql`select * from devices where id = ${id} limit 1`;
   const device = devices[0];
   if (!device) notFound();
+  // Adresse ohne Koordinaten? Einmalig automatisch verorten.
+  await backfillGeocodes([device]);
 
   const { rows: sites } = await sql`
     select * from sites where device_id = ${id} order by position asc, created_at asc
@@ -255,7 +258,8 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
       <div className="card">
         <h2>Standort</h2>
         <p className="muted" style={{ marginTop: 0, marginBottom: 10, fontSize: 13 }}>
-          Klick auf die Karte, wo das Display physisch steht — erscheint als Pin in der Übersicht.
+          Wird automatisch aus der Adresse (unten in „Einstellungen") gesetzt. Zum Feinjustieren
+          hier ins Stadtgebiet klicken.
         </p>
         <LocationPicker
           deviceId={id}
@@ -294,12 +298,13 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
               <input name="screen_off_time" type="time" defaultValue={hhmm(device.screen_off_time)} style={{ width: '100%' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label>Standort-Bezeichnung (optional)</label>
+              <label>Standort-Adresse</label>
               <input name="location" defaultValue={device.location || ''}
-                     placeholder="z. B. Bäckerei Müller, Stadtmarkt 1"
+                     placeholder="z. B. Stadtmarkt 1, 38259 Salzgitter"
                      style={{ width: '100%' }} />
               <p className="muted" style={{ marginTop: 4, fontSize: 12 }}>
-                Optionaler Text fürs Karten-Popup. Die <strong>Position</strong> setzt du oben unter „Standort" per Klick auf die Karte.
+                Wird beim Speichern <strong>automatisch auf der Karte verortet</strong>. Je genauer
+                (Straße, PLZ, Ort), desto besser. Feinjustieren geht oben unter „Standort" per Klick.
               </p>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>

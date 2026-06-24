@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { sql, ensureSchema } from '@/lib/db';
+import { geocodeAddress } from '@/lib/geo';
 import { signToken, SESSION_COOKIE } from '@/lib/auth';
 
 // ---- Auth ----
@@ -56,6 +57,14 @@ export async function updateDeviceSettings(formData: FormData) {
   const remoteUrl = String(formData.get('remote_url') || '').trim() || null;
   const location = String(formData.get('location') || '').trim() || null;
   await ensureSchema();
+  // Bisherige Adresse/Koordinaten lesen, um zu entscheiden, ob neu verortet wird.
+  let oldLocation: string | null = null;
+  let hasCoords = false;
+  try {
+    const { rows } = await sql`select location, lat, lng from devices where id = ${id}`;
+    oldLocation = rows[0]?.location ?? null;
+    hasCoords = rows[0]?.lat != null && rows[0]?.lng != null;
+  } catch { /* Spalten evtl. noch nicht migriert */ }
   await sql`
     update devices
        set name = ${name}, rotation_interval = ${rotation}, idle_timeout = ${idle},
@@ -74,6 +83,16 @@ export async function updateDeviceSettings(formData: FormData) {
   } catch {
     /* Spalte location evtl. noch nicht migriert -> ignorieren */
   }
+  // Adresse automatisch auf der Karte verorten — nur wenn sie neu/geändert ist
+  // oder noch keine Koordinaten existieren (manuell per Klick gesetzte bleiben so
+  // erhalten). Das eigentliche Kartenbild bleibt selbstgezeichnet.
+  if (location && (location !== oldLocation || !hasCoords)) {
+    const c = await geocodeAddress(location);
+    if (c) {
+      try { await sql`update devices set lat = ${c.lat}, lng = ${c.lng} where id = ${id}`; } catch {}
+    }
+  }
+  revalidatePath('/');
   revalidatePath(`/devices/${id}`);
 }
 

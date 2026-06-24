@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { sql, ensureSchema } from '@/lib/db';
+import { backfillGeocodes } from '@/lib/geo';
 import { createDevice, logout } from './actions';
 import AutoRefresh from './auto-refresh';
 import CityMap from './CityMap';
@@ -127,7 +128,10 @@ export default async function Dashboard() {
   const offline = devices.length - online;
   const appOn = devices.filter((d) => isOnline(d.last_seen_at) && d.app_active).length;
 
-  // Geräte mit gesetzten Koordinaten für die Karte (Marker direkt, kein Geocoding).
+  // Geräte mit Adresse, aber ohne Koordinaten einmalig automatisch verorten.
+  await backfillGeocodes(devices);
+
+  // Geräte mit gesetzten Koordinaten für die Karte (Marker direkt).
   const mapDevices = devices
     .filter((d: any) => d.lat != null && d.lng != null)
     .map((d: any) => ({
