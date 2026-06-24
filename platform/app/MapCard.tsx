@@ -1,65 +1,13 @@
 'use client';
-// Interaktive Standort-Karte (Leaflet + OpenStreetMap, ohne API-Key). Die beim
-// Geraet hinterlegten Adressen werden clientseitig per Nominatim geocodiert und
-// im localStorage gecacht (jede Adresse nur einmal). Leaflet wird per CDN
-// nachgeladen -> keine zusaetzliche npm-Abhaengigkeit, kein SSR-Problem.
+// Standort-Karte (Leaflet + OpenStreetMap). Nutzt fest gespeicherte Koordinaten
+// (auf der Geraeteseite per Klick gesetzt) — kein externes Geocoding noetig.
 import { useEffect, useRef, useState } from 'react';
+import { loadLeaflet } from './leaflet-loader';
 
-type MapDevice = { id: string; name: string; location: string; online: boolean };
+type MapDevice = { id: string; name: string; label: string; lat: number; lng: number; online: boolean };
 
 // Salzgitter (Fallback-Mittelpunkt, bis Marker den Ausschnitt bestimmen).
 const SALZGITTER: [number, number] = [52.1503, 10.3594];
-
-function loadLeaflet(): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const w = window as any;
-    if (w.L) return resolve(w.L);
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
-    let script = document.getElementById('leaflet-js') as HTMLScriptElement | null;
-    if (script) {
-      script.addEventListener('load', () => resolve(w.L));
-      script.addEventListener('error', reject);
-      return;
-    }
-    script = document.createElement('script');
-    script.id = 'leaflet-js';
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => resolve(w.L);
-    script.onerror = reject;
-    document.body.appendChild(script);
-  });
-}
-
-async function geocode(address: string): Promise<[number, number] | null> {
-  const key = 'geo:' + address;
-  try {
-    const cached = localStorage.getItem(key);
-    if (cached != null) {
-      const p = JSON.parse(cached);
-      return p && typeof p.lat === 'number' ? [p.lat, p.lng] : null;
-    }
-  } catch { /* localStorage nicht verfuegbar */ }
-  try {
-    const res = await fetch(
-      'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(address),
-      { headers: { Accept: 'application/json' } },
-    );
-    const data = await res.json();
-    const hit = Array.isArray(data) ? data[0] : null;
-    const coord: [number, number] | null = hit ? [parseFloat(hit.lat), parseFloat(hit.lon)] : null;
-    try { localStorage.setItem(key, JSON.stringify(coord ? { lat: coord[0], lng: coord[1] } : null)); } catch {}
-    return coord;
-  } catch {
-    return null;
-  }
-}
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => {
@@ -91,11 +39,10 @@ export default function MapCard({ devices }: { devices: MapDevice[] }) {
         attribution: '&copy; OpenStreetMap',
       }).addTo(map);
 
-      const located: [number, number][] = [];
+      const pts: [number, number][] = [];
       for (const d of devicesRef.current) {
-        if (!d.location || cancelled) continue;
-        const c = await geocode(d.location);
-        if (!c || cancelled) continue;
+        if (!isFinite(d.lat) || !isFinite(d.lng)) continue;
+        const c: [number, number] = [d.lat, d.lng];
         L.circleMarker(c, {
           radius: 10,
           color: '#0a0a0a',
@@ -104,14 +51,14 @@ export default function MapCard({ devices }: { devices: MapDevice[] }) {
           fillOpacity: 1,
         })
           .addTo(map)
-          .bindPopup(`<strong>${escapeHtml(d.name)}</strong><br>${escapeHtml(d.location)}`);
-        located.push(c);
+          .bindPopup(`<strong>${escapeHtml(d.name)}</strong>${d.label ? '<br>' + escapeHtml(d.label) : ''}`);
+        pts.push(c);
       }
       if (cancelled) return;
-      if (located.length === 1) map.setView(located[0], 14);
-      else if (located.length > 1) map.fitBounds(located, { padding: [40, 40] });
+      if (pts.length === 1) map.setView(pts[0], 14);
+      else if (pts.length > 1) map.fitBounds(pts, { padding: [40, 40] });
       setTimeout(() => { if (!cancelled && map) map.invalidateSize(); }, 100);
-      setStatus(located.length ? 'ready' : 'empty');
+      setStatus(pts.length ? 'ready' : 'empty');
     })();
     return () => { cancelled = true; if (map) map.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,7 +76,7 @@ export default function MapCard({ devices }: { devices: MapDevice[] }) {
             {status === 'loading'
               ? 'Karte lädt…'
               : status === 'empty'
-              ? 'Noch keine Standorte – Adresse beim Gerät eintragen.'
+              ? 'Noch keine Standorte – auf der Geräteseite per Klick auf die Karte setzen.'
               : 'Karte konnte nicht geladen werden.'}
           </div>
         )}

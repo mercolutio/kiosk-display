@@ -64,7 +64,7 @@ export default async function Dashboard() {
   let devices: any[] = [];
   try {
     const r = await sql`
-      select id, name, last_seen_at, current_site, app_active, location from devices order by created_at asc
+      select id, name, last_seen_at, current_site, app_active, location, lat, lng from devices order by created_at asc
     `;
     devices = r.rows;
   } catch {
@@ -127,10 +127,13 @@ export default async function Dashboard() {
   const offline = devices.length - online;
   const appOn = devices.filter((d) => isOnline(d.last_seen_at) && d.app_active).length;
 
-  // Geräte mit hinterlegtem Standort für die Karte (Adresse -> Marker).
+  // Geräte mit gesetzten Koordinaten für die Karte (Marker direkt, kein Geocoding).
   const mapDevices = devices
-    .filter((d: any) => d.location)
-    .map((d: any) => ({ id: d.id, name: d.name, location: d.location as string, online: isOnline(d.last_seen_at) }));
+    .filter((d: any) => d.lat != null && d.lng != null)
+    .map((d: any) => ({
+      id: d.id, name: d.name, label: d.location || '',
+      lat: Number(d.lat), lng: Number(d.lng), online: isOnline(d.last_seen_at),
+    }));
 
   return (
     <div className="container">
@@ -164,16 +167,21 @@ export default async function Dashboard() {
               {devices.map((d: any) => {
                 const on = isOnline(d.last_seen_at);
                 const match = d.current_site ? siteByKey.get(`${d.id}\n${d.current_site}`) : undefined;
+                const pin = d.lat != null && d.lng != null
+                  ? `https://www.openstreetmap.org/?mlat=${d.lat}&mlon=${d.lng}#map=18/${d.lat}/${d.lng}`
+                  : d.location
+                  ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(d.location)}`
+                  : null;
                 return (
                   <tr key={d.id}>
                     <td>
                       <Link href={`/devices/${d.id}`}>{d.name}</Link>
-                      {d.location && (
+                      {pin && (
                         <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.location)}`}
+                          href={pin}
                           target="_blank"
                           rel="noreferrer"
-                          title={`Standort: ${d.location}`}
+                          title={d.location ? `Standort: ${d.location}` : 'Standort öffnen'}
                           style={{ marginLeft: 8, textDecoration: 'none' }}
                         >📍</a>
                       )}

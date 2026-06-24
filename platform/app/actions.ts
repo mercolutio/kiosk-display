@@ -77,6 +77,27 @@ export async function updateDeviceSettings(formData: FormData) {
   revalidatePath(`/devices/${id}`);
 }
 
+// Standort-Koordinaten setzen (per Klick auf der Karte) bzw. entfernen.
+export async function setDeviceLocation(deviceId: string, lat: number, lng: number) {
+  if (!deviceId || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+  await ensureSchema();
+  try {
+    await sql`update devices set lat = ${lat}, lng = ${lng} where id = ${deviceId}`;
+  } catch { /* Spalten evtl. noch nicht migriert */ }
+  revalidatePath('/');
+  revalidatePath(`/devices/${deviceId}`);
+}
+
+export async function clearDeviceLocation(deviceId: string) {
+  if (!deviceId) return;
+  await ensureSchema();
+  try {
+    await sql`update devices set lat = null, lng = null where id = ${deviceId}`;
+  } catch { /* Spalten evtl. noch nicht migriert */ }
+  revalidatePath('/');
+  revalidatePath(`/devices/${deviceId}`);
+}
+
 // ---- Seiten ----
 export async function addSite(formData: FormData) {
   const deviceId = String(formData.get('device_id') || '');

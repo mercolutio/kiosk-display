@@ -14,6 +14,10 @@ export function ensureSchema(): Promise<void> {
       catch (e) { console.error('[db] ensureSchema sites.invoiced:', (e as Error).message); }
       try { await sql`alter table devices add column if not exists location text`; }
       catch (e) { console.error('[db] ensureSchema devices.location:', (e as Error).message); }
+      try { await sql`alter table devices add column if not exists lat double precision`; }
+      catch (e) { console.error('[db] ensureSchema devices.lat:', (e as Error).message); }
+      try { await sql`alter table devices add column if not exists lng double precision`; }
+      catch (e) { console.error('[db] ensureSchema devices.lng:', (e as Error).message); }
     })();
   }
   return schemaReady;
