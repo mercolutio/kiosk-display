@@ -1,0 +1,94 @@
+'use client';
+// Selbstgezeichnete Salzgitter-Karte: SVG aus dem eingebetteten Umriss, ganz
+// ohne externen Karten-/Geocoding-Dienst und ohne Leaflet. Marker werden über
+// ihre Koordinaten projiziert; mit onPick wird die Karte anklickbar und liefert
+// die geklickte Position (lat/lng) zurück.
+import { SALZGITTER_RING } from './salzgitter';
+
+export type CityMarker = { id: string; name: string; lat: number; lng: number; online?: boolean; label?: string };
+
+const W = 380;
+const PAD = 16;
+
+const lngs = SALZGITTER_RING.map((p) => p[0]);
+const lats = SALZGITTER_RING.map((p) => p[1]);
+const minLng = Math.min(...lngs);
+const maxLng = Math.max(...lngs);
+const minLat = Math.min(...lats);
+const maxLat = Math.max(...lats);
+// Längengrade an der geografischen Breite stauchen (cos), damit die Form stimmt.
+const K = Math.cos(((minLat + maxLat) / 2) * Math.PI / 180);
+const SCALE = (W - 2 * PAD) / ((maxLng - minLng) * K);
+const H = Math.round(2 * PAD + (maxLat - minLat) * SCALE);
+
+function project(lng: number, lat: number): [number, number] {
+  return [PAD + (lng - minLng) * K * SCALE, PAD + (maxLat - lat) * SCALE];
+}
+function unproject(x: number, y: number): { lat: number; lng: number } {
+  return { lat: maxLat - (y - PAD) / SCALE, lng: minLng + (x - PAD) / (K * SCALE) };
+}
+const RING_PATH =
+  SALZGITTER_RING.map((p, i) => {
+    const [x, y] = project(p[0], p[1]);
+    return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }).join(' ') + ' Z';
+
+export default function CityMap({
+  markers,
+  maxWidth = 380,
+  onPick,
+  emptyHint,
+}: {
+  markers: CityMarker[];
+  maxWidth?: number;
+  onPick?: (lat: number, lng: number) => void;
+  emptyHint?: string;
+}) {
+  const valid = markers.filter((m) => Number.isFinite(m.lat) && Number.isFinite(m.lng));
+
+  function handleClick(e: React.MouseEvent<SVGSVGElement>) {
+    if (!onPick) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * W;
+    const y = ((e.clientY - r.top) / r.height) * H;
+    const { lat, lng } = unproject(x, y);
+    onPick(lat, lng);
+  }
+
+  return (
+    <div style={{ width: '100%', maxWidth, margin: '0 auto' }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{
+          width: '100%',
+          height: 'auto',
+          display: 'block',
+          borderRadius: 10,
+          background: '#0e0e10',
+          cursor: onPick ? 'crosshair' : 'default',
+        }}
+        onClick={handleClick}
+        role="img"
+        aria-label="Karte von Salzgitter mit Display-Standorten"
+      >
+        <path d={RING_PATH} fill="#13251a" stroke="#34c759" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+        {valid.map((m) => {
+          const [x, y] = project(m.lng, m.lat);
+          return (
+            <g key={m.id}>
+              <circle cx={x} cy={y} r={6.5} fill={m.online === false ? '#f99' : '#34c759'} stroke="#0a0a0a" strokeWidth={2}>
+                <title>{m.name}{m.label ? ' — ' + m.label : ''}</title>
+              </circle>
+              <text x={x + 10} y={y + 4} fontSize={12} fill="#e8e8ea" stroke="#0b0b0c" strokeWidth={3} style={{ paintOrder: 'stroke' }}>
+                {m.name}
+              </text>
+            </g>
+          );
+        })}
+        {valid.length === 0 && emptyHint && (
+          <text x={W / 2} y={H / 2} fontSize={13} fill="#888" textAnchor="middle">{emptyHint}</text>
+        )}
+      </svg>
+    </div>
+  );
+}

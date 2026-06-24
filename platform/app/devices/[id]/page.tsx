@@ -259,6 +259,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
         </p>
         <LocationPicker
           deviceId={id}
+          name={device.name}
           lat={device.lat == null ? null : Number(device.lat)}
           lng={device.lng == null ? null : Number(device.lng)}
         />
