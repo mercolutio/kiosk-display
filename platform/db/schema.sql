@@ -31,6 +31,7 @@ create table if not exists sites (
   duration    int,                                 -- optionale Anzeigedauer; NULL => rotation_interval
   position    int  not null default 0,             -- Reihenfolge
   enabled     boolean not null default true,
+  invoiced    boolean not null default true,        -- fakturiert? nicht fakturiert => zaehlt nicht ins MRR
   created_at  timestamptz not null default now()
 );
 create index if not exists sites_device_pos on sites (device_id, position);

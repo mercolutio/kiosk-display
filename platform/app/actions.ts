@@ -3,7 +3,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { sql } from '@/lib/db';
+import { sql, ensureSchema } from '@/lib/db';
 import { signToken, SESSION_COOKIE } from '@/lib/auth';
 
 // ---- Auth ----
@@ -79,7 +79,9 @@ export async function addSite(formData: FormData) {
   const type = ['web', 'image', 'video'].includes(typeRaw) ? typeRaw : 'web';
   const durationRaw = String(formData.get('duration') || '').trim();
   const duration = durationRaw ? parseInt(durationRaw, 10) : null;
+  const invoiced = formData.get('invoiced') != null;
   if (deviceId && name && url) {
+    await ensureSchema();
     const { rows } = await sql`
       select coalesce(max(position), -1) + 1 as pos from sites where device_id = ${deviceId}
     `;
@@ -88,8 +90,9 @@ export async function addSite(formData: FormData) {
       values (${deviceId}, ${name}, ${url}, ${duration}, ${rows[0].pos})
       returning id
     `;
-    // Typ separat setzen -> bricht nicht, falls die Spalte type noch nicht migriert ist.
+    // Typ + Fakturiert separat setzen -> bricht nicht, falls die Spalte noch nicht migriert ist.
     try { await sql`update sites set type = ${type} where id = ${ins[0].id}`; } catch {}
+    try { await sql`update sites set invoiced = ${invoiced} where id = ${ins[0].id}`; } catch {}
   }
   revalidatePath(`/devices/${deviceId}`);
 }
@@ -102,13 +105,16 @@ export async function updateSite(formData: FormData) {
   const durationRaw = String(formData.get('duration') || '').trim();
   const duration = durationRaw ? parseInt(durationRaw, 10) : null;
   const enabled = formData.get('enabled') != null;
+  const invoiced = formData.get('invoiced') != null;
   const typeRaw = String(formData.get('type') || '').trim();
   const type = ['web', 'image', 'video'].includes(typeRaw) ? typeRaw : '';
+  await ensureSchema();
   await sql`
     update sites set name = ${name}, url = ${url}, duration = ${duration}, enabled = ${enabled}
      where id = ${id}
   `;
   if (type) { try { await sql`update sites set type = ${type} where id = ${id}`; } catch {} }
+  try { await sql`update sites set invoiced = ${invoiced} where id = ${id}`; } catch {}
   revalidatePath(`/devices/${deviceId}`);
 }
 

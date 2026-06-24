@@ -135,6 +135,9 @@ export default function AddSiteForm({ deviceId }: { deviceId: string }) {
         </div>
       )}
       <input name="duration" type="number" min="1" placeholder="Dauer s" style={{ width: 90 }} />
+      <label className="row" style={{ margin: 0, color: '#bbb', fontSize: 13 }} title="Fakturiert? Nicht fakturierte Slots zählen nicht ins MRR.">
+        <input type="checkbox" name="invoiced" defaultChecked /> fakturiert
+      </label>
       <button className="btn-primary btn-sm" type="submit" disabled={uploading || (type !== 'web' && !mediaUrl)}>+ Seite</button>
     </form>
   );

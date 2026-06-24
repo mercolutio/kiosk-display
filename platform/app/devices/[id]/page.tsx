@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { sql } from '@/lib/db';
+import { sql, ensureSchema } from '@/lib/db';
 import {
   updateDeviceSettings, deleteDevice,
   updateSite, deleteSite, moveSite,
@@ -28,6 +28,7 @@ function fmtDur(sec: number): string {
 
 export default async function DevicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  await ensureSchema();
 
   const { rows: devices } = await sql`select * from devices where id = ${id} limit 1`;
   const device = devices[0];
@@ -219,6 +220,9 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
               <input name="duration" type="number" min="1" defaultValue={s.duration ?? ''} placeholder="Dauer s" style={{ width: 90 }} />
               <label className="row" style={{ margin: 0, color: '#bbb' }}>
                 <input type="checkbox" name="enabled" defaultChecked={s.enabled} /> aktiv
+              </label>
+              <label className="row" style={{ margin: 0, color: '#bbb' }} title="Fakturiert? Nicht fakturierte Slots zählen nicht ins MRR.">
+                <input type="checkbox" name="invoiced" defaultChecked={s.invoiced ?? true} /> fakturiert
               </label>
               <button className="btn-sm" type="submit">Speichern</button>
             </form>

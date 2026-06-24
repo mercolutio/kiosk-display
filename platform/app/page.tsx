@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { sql } from '@/lib/db';
+import { sql, ensureSchema } from '@/lib/db';
 import { createDevice, logout } from './actions';
 import AutoRefresh from './auto-refresh';
 
@@ -59,6 +59,7 @@ const customerRate = (displays: number) => (displays >= VOL_FROM ? PRICE_VOL : P
 const eur = (v: number) => v.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 
 export default async function Dashboard() {
+  await ensureSchema();
   let devices: any[] = [];
   try {
     const r = await sql`
@@ -73,38 +74,46 @@ export default async function Dashboard() {
   }
 
   // Konfigurierte Seiten einmal laden — daraus speisen sich „Aktuelle Seite"
-  // (lesbarer Name) UND die Kunden-/MRR-Übersicht. Fällt zurück, falls type fehlt.
+  // (lesbarer Name) UND die Kunden-/MRR-Übersicht. Fällt zurück, falls Spalten fehlen.
   let siteRows: any[] = [];
   try {
+    siteRows = (await sql`select device_id, url, name, type, invoiced from sites`).rows;
+  } catch {
     try {
       siteRows = (await sql`select device_id, url, name, type from sites`).rows;
     } catch {
-      siteRows = (await sql`select device_id, url, name from sites`).rows;
+      try { siteRows = (await sql`select device_id, url, name from sites`).rows; } catch {}
     }
-  } catch { /* sites-Tabelle evtl. noch nicht angelegt */ }
+  }
   const siteByKey = new Map<string, { name?: string; type?: string }>();
   for (const s of siteRows) siteByKey.set(`${s.device_id}\n${s.url}`, { name: s.name, type: s.type });
 
-  // Kunden aus den Seiten ableiten: nach Name zusammengefasst (Dedup), gezählt
-  // wird je Kunde die Anzahl verschiedener Displays = gekaufte Slots.
+  // Kunden aus den Seiten ableiten: nach Name zusammengefasst (Dedup). Je Display
+  // wird gemerkt, ob die Platzierung fakturiert ist (= mind. ein fakturierter Slot
+  // dort). Nicht fakturierte Displays zählen nicht ins MRR.
   const deviceNameById = new Map<string, string>(devices.map((d: any) => [d.id, d.name] as [string, string]));
-  const custByKey = new Map<string, { name: string; devices: Set<string> }>();
+  const custByKey = new Map<string, { name: string; placements: Map<string, boolean> }>();
   for (const s of siteRows) {
     const name = (s.name ?? '').trim();
     if (!name) continue;
-    const c = custByKey.get(name.toLowerCase());
-    if (c) c.devices.add(s.device_id);
-    else custByKey.set(name.toLowerCase(), { name, devices: new Set<string>([s.device_id]) });
+    const key = name.toLowerCase();
+    let c = custByKey.get(key);
+    if (!c) { c = { name, placements: new Map<string, boolean>() }; custByKey.set(key, c); }
+    const billed = (c.placements.get(s.device_id) || false) || (s.invoiced !== false);
+    c.placements.set(s.device_id, billed);
   }
   const customers = [...custByKey.values()]
     .map((c) => {
-      const displays = c.devices.size;
-      const rate = customerRate(displays);
-      return { name: c.name, displays, rate, mrr: displays * rate, deviceIds: [...c.devices] };
+      const entries = [...c.placements.entries()];          // [deviceId, fakturiert?]
+      const billedDisplays = entries.filter(([, b]) => b).length;
+      const unbilled = entries.length - billedDisplays;
+      const rate = customerRate(billedDisplays);
+      return { name: c.name, entries, billedDisplays, unbilled, rate, mrr: billedDisplays * rate };
     })
     .sort((a, b) => b.mrr - a.mrr || a.name.localeCompare(b.name, 'de'));
   const totalMrr = customers.reduce((a, c) => a + c.mrr, 0);
-  const totalSlots = customers.reduce((a, c) => a + c.displays, 0);
+  const totalBilled = customers.reduce((a, c) => a + c.billedDisplays, 0);
+  const totalUnbilled = customers.reduce((a, c) => a + c.unbilled, 0);
 
   const online = devices.filter((d) => isOnline(d.last_seen_at)).length;
   const offline = devices.length - online;
@@ -169,7 +178,8 @@ export default async function Dashboard() {
           <h2 style={{ margin: 0 }}>Kunden ({customers.length})</h2>
           {customers.length > 0 && (
             <div className="row" style={{ gap: 14, fontSize: 13 }}>
-              <span className="muted">{totalSlots} Platzierung{totalSlots === 1 ? '' : 'en'}</span>
+              <span className="muted">{totalBilled} fakturiert</span>
+              {totalUnbilled > 0 && <span style={{ color: '#ffd27a' }}>{totalUnbilled} nicht fakt.</span>}
               <span style={{ color: '#34c759', fontWeight: 600 }}>MRR {eur(totalMrr)}</span>
             </div>
           )}
@@ -183,7 +193,7 @@ export default async function Dashboard() {
           <table>
             <thead>
               <tr>
-                <th>Kunde</th><th>Displays</th><th>Tarif</th>
+                <th>Kunde</th><th>Displays (fakturiert)</th><th>Tarif</th>
                 <th style={{ textAlign: 'right' }}>MRR / Monat</th>
               </tr>
             </thead>
@@ -192,19 +202,29 @@ export default async function Dashboard() {
                 <tr key={c.name}>
                   <td>{c.name}</td>
                   <td>
-                    {c.displays}
-                    <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>
-                      {c.deviceIds.map((id) => deviceNameById.get(id) || id).join(', ')}
-                    </span>
+                    {c.billedDisplays}
+                    {c.unbilled > 0 && (
+                      <span style={{ color: '#ffd27a', marginLeft: 8, fontSize: 12 }}>
+                        +{c.unbilled} nicht fakturiert
+                      </span>
+                    )}
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                      {c.entries
+                        .map(([id, billed]) => (deviceNameById.get(id) || id) + (billed ? '' : ' (nicht fakt.)'))
+                        .join(', ')}
+                    </div>
                   </td>
-                  <td className="muted">{eur(c.rate)}/Display</td>
+                  <td className="muted">{c.billedDisplays > 0 ? `${eur(c.rate)}/Display` : '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600 }}>{eur(c.mrr)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={3} className="muted">Gesamt · {customers.length} Kunden · {totalSlots} Platzierungen</td>
+                <td colSpan={3} className="muted">
+                  Gesamt · {customers.length} Kunden · {totalBilled} fakturiert
+                  {totalUnbilled > 0 ? ` · ${totalUnbilled} nicht fakturiert` : ''}
+                </td>
                 <td style={{ textAlign: 'right', fontWeight: 700, color: '#34c759' }}>{eur(totalMrr)}</td>
               </tr>
             </tfoot>
@@ -212,7 +232,7 @@ export default async function Dashboard() {
         )}
         <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>
           Preispolitik: 19,90 €/Display · ab 3 Displays 14,90 €/Display. Gleicher Name = ein Kunde
-          (keine Dopplung), gezählt wird die Zahl der Displays.
+          (keine Dopplung). <strong>Nicht fakturierte</strong> Slots zählen nicht ins MRR.
         </p>
       </div>
 
