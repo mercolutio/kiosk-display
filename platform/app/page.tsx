@@ -60,7 +60,8 @@ const VOL_FROM = 3;
 const customerRate = (displays: number) => (displays >= VOL_FROM ? PRICE_VOL : PRICE_STD);
 const eur = (v: number) => v.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ debug?: string }> }) {
+  const debug = (await searchParams)?.debug === 'geo';
   await ensureSchema();
   let devices: any[] = [];
   try {
@@ -79,6 +80,23 @@ export default async function Dashboard() {
         select id, name, last_seen_at, current_site from devices order by created_at asc
       `;
       devices = r.rows;
+    }
+  }
+
+  // --- temporäre Diagnose (?debug=geo): zeigt gespeicherte Adresse/Koordinaten
+  // und ob der Geocoder von Vercel aus überhaupt erreichbar ist ---
+  let geoTest = '(aus)';
+  if (debug) {
+    try {
+      const r = await fetch(
+        'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=de&q=' +
+          encodeURIComponent('Rathaus, Salzgitter'),
+        { headers: { 'User-Agent': 'kiosk-display/1.0 (fleet.microwerbung.com)', Accept: 'application/json' }, cache: 'no-store' },
+      );
+      const body = await r.text();
+      geoTest = `HTTP ${r.status} · ${body.slice(0, 200)}`;
+    } catch (e) {
+      geoTest = 'fetch-Fehler: ' + (e as Error).message;
     }
   }
 
@@ -148,6 +166,16 @@ export default async function Dashboard() {
           <button className="btn-sm" type="submit">Abmelden</button>
         </form>
       </div>
+
+      {debug && (
+        <div className="card" style={{ borderColor: '#5a2a2a' }}>
+          <h2>Diagnose Standorte</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>
+            {devices.map((d: any) => `${d.name}: location=${JSON.stringify(d.location ?? null)} lat=${d.lat ?? null} lng=${d.lng ?? null}`).join('\n')
+              + `\n\nGeocode-Test "Rathaus, Salzgitter":\n${geoTest}`}
+          </pre>
+        </div>
+      )}
 
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
