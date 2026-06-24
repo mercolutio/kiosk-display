@@ -286,11 +286,30 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
 
       {/* Agent-Einrichtung */}
       <div className="card">
-        <h2>Pi-Agent verbinden</h2>
-        <p className="muted">Trag das auf dem Pi in <code>~/.config/kiosk-agent.env</code> ein:</p>
-        <pre>{`KIOSK_API_URL=${baseUrl}
+        <h2>Pi einrichten</h2>
+        <p className="muted">
+          Neuen Pi von Null aufsetzen? Komplette Schritt-für-Schritt-Anleitung auf der{' '}
+          <Link href="/">Startseite</Link>. Für <strong>dieses</strong> Gerät genügt dieser eine Befehl auf
+          dem Pi (Terminal oder SSH) — URL und Token sind schon eingesetzt:
+        </p>
+        <pre>{`git clone --branch claude/gallant-thompson-RB2Fq \\
+  https://github.com/mercolutio/kiosk-display.git ~/kiosk-display
+KIOSK_API_URL=${baseUrl} \\
+KIOSK_DEVICE_TOKEN=${device.token} \\
+bash ~/kiosk-display/platform/agent/install.sh`}</pre>
+        <p className="muted">
+          Installiert Node, Electron, Agent und Autostart und meldet das Gerät hier an — danach wird es oben
+          „online". Beim Punkt „Fernsteuern einrichten?" mit <strong>J</strong> bestätigen, wenn du den
+          Bildschirm aus der Ferne sehen/bedienen willst.
+        </p>
+        <details>
+          <summary className="muted" style={{ cursor: 'pointer' }}>Nur Konfiguration (manuell)</summary>
+          <p className="muted" style={{ marginTop: 8 }}>
+            Falls das Repo schon auf dem Pi liegt — Datei <code>~/.config/kiosk-agent.env</code>:
+          </p>
+          <pre>{`KIOSK_API_URL=${baseUrl}
 KIOSK_DEVICE_TOKEN=${device.token}`}</pre>
-        <p className="muted">Setup-Schritte: siehe <code>platform/README.md</code> im Repo.</p>
+        </details>
       </div>
 
       {/* Gefahrenzone */}
