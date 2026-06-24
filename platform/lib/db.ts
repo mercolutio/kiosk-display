@@ -10,11 +10,10 @@ let schemaReady: Promise<void> | null = null;
 export function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
-      try {
-        await sql`alter table sites add column if not exists invoiced boolean not null default true`;
-      } catch (e) {
-        console.error('[db] ensureSchema:', (e as Error).message);
-      }
+      try { await sql`alter table sites add column if not exists invoiced boolean not null default true`; }
+      catch (e) { console.error('[db] ensureSchema sites.invoiced:', (e as Error).message); }
+      try { await sql`alter table devices add column if not exists location text`; }
+      catch (e) { console.error('[db] ensureSchema devices.location:', (e as Error).message); }
     })();
   }
   return schemaReady;

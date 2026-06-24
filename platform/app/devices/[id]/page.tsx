@@ -101,6 +101,11 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
               {device.app_active ? '● App an' : '● App aus'}
             </span>
           )}
+          {device.location && (
+            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(device.location)}`}
+               target="_blank" rel="noreferrer" title={`Standort: ${device.location}`}
+               style={{ textDecoration: 'none' }}>📍</a>
+          )}
         </div>
       </div>
 
@@ -270,6 +275,15 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             <div>
               <label>Bildschirm aus ab (optional)</label>
               <input name="screen_off_time" type="time" defaultValue={hhmm(device.screen_off_time)} style={{ width: '100%' }} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label>Standort (Adresse)</label>
+              <input name="location" defaultValue={device.location || ''}
+                     placeholder="z. B. Bäckerei Müller, Hauptstraße 1, 12345 Berlin"
+                     style={{ width: '100%' }} />
+              <p className="muted" style={{ marginTop: 4, fontSize: 12 }}>
+                Wo das Gerät physisch steht. Erscheint als 📍 neben dem Namen und verlinkt zu Google Maps.
+              </p>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label>Fernsteuer-Adresse (optional)</label>
