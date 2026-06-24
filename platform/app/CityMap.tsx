@@ -33,6 +33,16 @@ const RING_PATH =
     return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
   }).join(' ') + ' Z';
 
+// Ein paar Stadtteile zur Orientierung (dezent), damit das Setzen per Klick leichter fällt.
+const DISTRICTS: { name: string; lat: number; lng: number }[] = [
+  { name: 'Lebenstedt', lat: 52.157, lng: 10.333 },
+  { name: 'Salzgitter-Bad', lat: 52.0588, lng: 10.358 },
+  { name: 'Thiede', lat: 52.196, lng: 10.476 },
+  { name: 'Watenstedt', lat: 52.123, lng: 10.383 },
+  { name: 'Gebhardshagen', lat: 52.085, lng: 10.300 },
+  { name: 'Lichtenberg', lat: 52.110, lng: 10.357 },
+];
+
 export default function CityMap({
   markers,
   maxWidth = 380,
@@ -72,6 +82,15 @@ export default function CityMap({
         aria-label="Karte von Salzgitter mit Display-Standorten"
       >
         <path d={RING_PATH} fill="#13251a" stroke="#34c759" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+        {DISTRICTS.map((d) => {
+          const [x, y] = project(d.lng, d.lat);
+          return (
+            <g key={d.name} pointerEvents="none">
+              <circle cx={x} cy={y} r={1.6} fill="#5a6b5f" />
+              <text x={x + 4} y={y + 3} fontSize={8} fill="#7e8d83">{d.name}</text>
+            </g>
+          );
+        })}
         {valid.map((m) => {
           const [x, y] = project(m.lng, m.lat);
           return (
