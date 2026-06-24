@@ -18,6 +18,7 @@ create table if not exists devices (
   remote_url       text,                           -- Live-Fernsteuerung (VNC/noVNC im Browser)
   offline_alerted_at timestamptz,                   -- gesetzt, solange ein Offline-Alarm fuer dieses Geraet aktiv ist
   app_active       boolean,                          -- laeuft die Kiosk-App? (vom Agent gemeldet; nur bei online aktuell)
+  location         text,                             -- physischer Standort (Adresse); 📍-Link in der Uebersicht
   created_at       timestamptz not null default now()
 );
 

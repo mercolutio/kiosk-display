@@ -63,14 +63,21 @@ export default async function Dashboard() {
   let devices: any[] = [];
   try {
     const r = await sql`
-      select id, name, last_seen_at, current_site, app_active from devices order by created_at asc
+      select id, name, last_seen_at, current_site, app_active, location from devices order by created_at asc
     `;
     devices = r.rows;
   } catch {
-    const r = await sql`
-      select id, name, last_seen_at, current_site from devices order by created_at asc
-    `;
-    devices = r.rows;
+    try {
+      const r = await sql`
+        select id, name, last_seen_at, current_site, app_active from devices order by created_at asc
+      `;
+      devices = r.rows;
+    } catch {
+      const r = await sql`
+        select id, name, last_seen_at, current_site from devices order by created_at asc
+      `;
+      devices = r.rows;
+    }
   }
 
   // Konfigurierte Seiten einmal laden — daraus speisen sich „Aktuelle Seite"
@@ -153,7 +160,18 @@ export default async function Dashboard() {
                 const match = d.current_site ? siteByKey.get(`${d.id}\n${d.current_site}`) : undefined;
                 return (
                   <tr key={d.id}>
-                    <td><Link href={`/devices/${d.id}`}>{d.name}</Link></td>
+                    <td>
+                      <Link href={`/devices/${d.id}`}>{d.name}</Link>
+                      {d.location && (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.location)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={`Standort: ${d.location}`}
+                          style={{ marginLeft: 8, textDecoration: 'none' }}
+                        >📍</a>
+                      )}
+                    </td>
                     <td>
                       <span className={on ? 'badge-online' : 'badge-offline'}>
                         {on ? '● online' : '● offline'}

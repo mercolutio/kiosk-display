@@ -54,18 +54,25 @@ export async function updateDeviceSettings(formData: FormData) {
   const onTime = String(formData.get('screen_on_time') || '').trim() || null;
   const offTime = String(formData.get('screen_off_time') || '').trim() || null;
   const remoteUrl = String(formData.get('remote_url') || '').trim() || null;
+  const location = String(formData.get('location') || '').trim() || null;
+  await ensureSchema();
   await sql`
     update devices
        set name = ${name}, rotation_interval = ${rotation}, idle_timeout = ${idle},
            screen_on_time = ${onTime}, screen_off_time = ${offTime}
      where id = ${id}
   `;
-  // Fernsteuer-Adresse separat schreiben, damit eine (noch) fehlende Spalte
-  // remote_url das Speichern der uebrigen Einstellungen nicht verhindert.
+  // Fernsteuer-Adresse + Standort separat schreiben, damit eine (noch) fehlende
+  // Spalte das Speichern der uebrigen Einstellungen nicht verhindert.
   try {
     await sql`update devices set remote_url = ${remoteUrl} where id = ${id}`;
   } catch {
     /* Spalte remote_url evtl. noch nicht migriert -> ignorieren */
+  }
+  try {
+    await sql`update devices set location = ${location} where id = ${id}`;
+  } catch {
+    /* Spalte location evtl. noch nicht migriert -> ignorieren */
   }
   revalidatePath(`/devices/${id}`);
 }
