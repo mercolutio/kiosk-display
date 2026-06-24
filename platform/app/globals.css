@@ -39,3 +39,12 @@ pre { padding: 12px; overflow-x: auto; font-size: 12px; }
 code { padding: 1px 5px; font-size: 12px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .error { color: #ff9a9a; font-size: 13px; }
+/* Aufklappbare Anleitung (Startseite): dezent, mit grünem Dreieck-Toggle. */
+details.guide { margin-top: 14px; border-top: 1px solid #262629; padding-top: 12px; }
+details.guide > summary { cursor: pointer; color: #34c759; font-weight: 600; font-size: 14px; list-style: none; }
+details.guide > summary::-webkit-details-marker { display: none; }
+details.guide > summary::before { content: '▸  '; }
+details.guide[open] > summary::before { content: '▾  '; }
+details.guide ol { padding-left: 18px; margin: 10px 0 0; line-height: 1.55; }
+details.guide li { margin-bottom: 10px; }
+details.guide li:last-child { margin-bottom: 0; }

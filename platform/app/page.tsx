@@ -142,8 +142,55 @@ export default async function Dashboard() {
           <button className="btn-primary" type="submit">Anlegen</button>
         </form>
         <p className="muted" style={{ marginTop: 8 }}>
-          Nach dem Anlegen bekommst du ein Geräte-Token für den Pi-Agent.
+          Nach dem Anlegen bekommst du auf der Geräteseite den fertigen Installationsbefehl (mit Token).
         </p>
+
+        <details className="guide">
+          <summary>📋 Komplette Anleitung: neuen Pi von Null einrichten</summary>
+          <div className="muted">
+            <p style={{ margin: '10px 0 0' }}>
+              Du brauchst: Raspberry Pi (5 empfohlen), SD-Karte ≥ 16 GB, Bildschirm, WLAN.
+            </p>
+            <ol>
+              <li>
+                <strong>SD-Karte flashen.</strong> Mit dem{' '}
+                <a href="https://www.raspberrypi.com/software/" target="_blank" rel="noreferrer">Raspberry&nbsp;Pi&nbsp;Imager</a>{' '}
+                „Raspberry Pi OS (64-bit) <strong>with Desktop</strong>" wählen. Im Imager (⚙️) gleich setzen:
+                Hostname (z.&nbsp;B. <code>kiosk001</code>), Benutzer + Passwort, WLAN, Zeitzone und{' '}
+                <strong>SSH aktivieren</strong>. Karte in den Pi, einschalten.
+              </li>
+              <li>
+                <strong>Autologin einschalten.</strong> Auf dem Pi <code>sudo raspi-config</code> →{' '}
+                <em>System Options</em> → <em>Boot / Auto Login</em> → <strong>Desktop Autologin</strong>,
+                danach <code>sudo reboot</code>. (Wichtig — der Kiosk läuft in der angemeldeten Desktop-Sitzung.)
+              </li>
+              <li>
+                <strong>Gerät hier anlegen.</strong> Oben Namen eintragen → <em>Anlegen</em>. Auf der
+                Geräteseite stehen dann <strong>API-URL + Token</strong> und der fertige Befehl.
+              </li>
+              <li>
+                <strong>Installieren.</strong> Auf dem Pi (Terminal oder per SSH) ausführen:
+                <pre style={{ marginTop: 6 }}>{`git clone --branch claude/gallant-thompson-RB2Fq \\
+  https://github.com/mercolutio/kiosk-display.git ~/kiosk-display
+bash ~/kiosk-display/platform/agent/install.sh`}</pre>
+                Das Skript fragt <strong>Plattform-URL + Token</strong> ab (von der Geräteseite kopieren),
+                installiert Node, Electron, Agent und Autostart — und bietet die <strong>Fernsteuerung</strong>{' '}
+                gleich mit an. Tipp: auf der Geräteseite steht der Befehl mit schon eingesetztem Token.
+              </li>
+              <li>
+                <strong>Fertig.</strong> Nach 1–2&nbsp;Min wird das Gerät hier{' '}
+                <span style={{ color: '#9f9' }}>● online</span>. Seiten, Bilder und Videos fügst du dann auf
+                der Geräteseite hinzu.
+              </li>
+              <li>
+                <strong>Fernsteuerung (optional).</strong> Im Installer „Fernsteuern einrichten?" mit{' '}
+                <strong>J</strong> bestätigen und einmal den <strong>Tailscale-Login-Link</strong> öffnen.
+                Die angezeigte Adresse beim Gerät unter <em>Einstellungen → Fernsteuer-Adresse</em> eintragen
+                → der Knopf <strong>🖥️ Fernsteuern</strong> erscheint.
+              </li>
+            </ol>
+          </div>
+        </details>
       </div>
     </div>
   );
