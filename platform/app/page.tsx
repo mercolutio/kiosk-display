@@ -50,6 +50,14 @@ function currentSiteLabel(current: string | null, match: { name?: string; type?:
   );
 }
 
+// Preispolitik fürs MRR: 19,90 €/Display, ab 3 Displays 14,90 €/Display
+// (der günstigere Satz gilt dann für alle Displays des Kunden).
+const PRICE_STD = 19.9;
+const PRICE_VOL = 14.9;
+const VOL_FROM = 3;
+const customerRate = (displays: number) => (displays >= VOL_FROM ? PRICE_VOL : PRICE_STD);
+const eur = (v: number) => v.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+
 export default async function Dashboard() {
   let devices: any[] = [];
   try {
@@ -64,18 +72,39 @@ export default async function Dashboard() {
     devices = r.rows;
   }
 
-  // Konfigurierte Seiten laden, um current_site auf einen lesbaren Namen zu mappen
-  // (Schluessel: Geraet + URL). Faellt zurueck, falls die type-Spalte fehlt.
-  const siteByKey = new Map<string, { name?: string; type?: string }>();
+  // Konfigurierte Seiten einmal laden — daraus speisen sich „Aktuelle Seite"
+  // (lesbarer Name) UND die Kunden-/MRR-Übersicht. Fällt zurück, falls type fehlt.
+  let siteRows: any[] = [];
   try {
-    let rows: any[] = [];
     try {
-      rows = (await sql`select device_id, url, name, type from sites`).rows;
+      siteRows = (await sql`select device_id, url, name, type from sites`).rows;
     } catch {
-      rows = (await sql`select device_id, url, name from sites`).rows;
+      siteRows = (await sql`select device_id, url, name from sites`).rows;
     }
-    for (const s of rows) siteByKey.set(`${s.device_id}\n${s.url}`, { name: s.name, type: s.type });
   } catch { /* sites-Tabelle evtl. noch nicht angelegt */ }
+  const siteByKey = new Map<string, { name?: string; type?: string }>();
+  for (const s of siteRows) siteByKey.set(`${s.device_id}\n${s.url}`, { name: s.name, type: s.type });
+
+  // Kunden aus den Seiten ableiten: nach Name zusammengefasst (Dedup), gezählt
+  // wird je Kunde die Anzahl verschiedener Displays = gekaufte Slots.
+  const deviceNameById = new Map<string, string>(devices.map((d: any) => [d.id, d.name] as [string, string]));
+  const custByKey = new Map<string, { name: string; devices: Set<string> }>();
+  for (const s of siteRows) {
+    const name = (s.name ?? '').trim();
+    if (!name) continue;
+    const c = custByKey.get(name.toLowerCase());
+    if (c) c.devices.add(s.device_id);
+    else custByKey.set(name.toLowerCase(), { name, devices: new Set<string>([s.device_id]) });
+  }
+  const customers = [...custByKey.values()]
+    .map((c) => {
+      const displays = c.devices.size;
+      const rate = customerRate(displays);
+      return { name: c.name, displays, rate, mrr: displays * rate, deviceIds: [...c.devices] };
+    })
+    .sort((a, b) => b.mrr - a.mrr || a.name.localeCompare(b.name, 'de'));
+  const totalMrr = customers.reduce((a, c) => a + c.mrr, 0);
+  const totalSlots = customers.reduce((a, c) => a + c.displays, 0);
 
   const online = devices.filter((d) => isOnline(d.last_seen_at)).length;
   const offline = devices.length - online;
@@ -133,6 +162,58 @@ export default async function Dashboard() {
             </tbody>
           </table>
         )}
+      </div>
+
+      <div className="card">
+        <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>Kunden ({customers.length})</h2>
+          {customers.length > 0 && (
+            <div className="row" style={{ gap: 14, fontSize: 13 }}>
+              <span className="muted">{totalSlots} Platzierung{totalSlots === 1 ? '' : 'en'}</span>
+              <span style={{ color: '#34c759', fontWeight: 600 }}>MRR {eur(totalMrr)}</span>
+            </div>
+          )}
+        </div>
+        {customers.length === 0 ? (
+          <p className="muted">
+            Noch keine Kunden. Sobald du einem Display eine Webseite, ein Bild oder ein Video gibst,
+            erscheint der Name hier automatisch — mit Umsatz nach Preisliste.
+          </p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Kunde</th><th>Displays</th><th>Tarif</th>
+                <th style={{ textAlign: 'right' }}>MRR / Monat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {customers.map((c) => (
+                <tr key={c.name}>
+                  <td>{c.name}</td>
+                  <td>
+                    {c.displays}
+                    <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>
+                      {c.deviceIds.map((id) => deviceNameById.get(id) || id).join(', ')}
+                    </span>
+                  </td>
+                  <td className="muted">{eur(c.rate)}/Display</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{eur(c.mrr)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={3} className="muted">Gesamt · {customers.length} Kunden · {totalSlots} Platzierungen</td>
+                <td style={{ textAlign: 'right', fontWeight: 700, color: '#34c759' }}>{eur(totalMrr)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+        <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>
+          Preispolitik: 19,90 €/Display · ab 3 Displays 14,90 €/Display. Gleicher Name = ein Kunde
+          (keine Dopplung), gezählt wird die Zahl der Displays.
+        </p>
       </div>
 
       <div className="card">
