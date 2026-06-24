@@ -9,6 +9,7 @@ import {
 } from '../../actions';
 import AutoRefresh from '../../auto-refresh';
 import AddSiteForm from './AddSiteForm';
+import RowToggle from './RowToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -218,12 +219,8 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
               <input name="name" defaultValue={s.name} placeholder="Name" style={{ width: 150 }} />
               <input name="url" defaultValue={s.url} placeholder="https://…" style={{ flex: 1, minWidth: 180 }} />
               <input name="duration" type="number" min="1" defaultValue={s.duration ?? ''} placeholder="Dauer s" style={{ width: 90 }} />
-              <label className="row" style={{ margin: 0, color: '#bbb' }}>
-                <input type="checkbox" name="enabled" defaultChecked={s.enabled} /> aktiv
-              </label>
-              <label className="row" style={{ margin: 0, color: '#bbb' }} title="Fakturiert? Nicht fakturierte Slots zählen nicht ins MRR.">
-                <input type="checkbox" name="invoiced" defaultChecked={s.invoiced ?? true} /> fakturiert
-              </label>
+              <RowToggle name="enabled" defaultChecked={s.enabled} label="aktiv" />
+              <RowToggle name="invoiced" defaultChecked={s.invoiced ?? true} label="fakturiert" />
               <button className="btn-sm" type="submit">Speichern</button>
             </form>
             <form action={moveSite}>
