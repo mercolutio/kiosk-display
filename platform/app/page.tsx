@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { sql, ensureSchema } from '@/lib/db';
 import { createDevice, logout } from './actions';
 import AutoRefresh from './auto-refresh';
+import MapCard from './MapCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,6 +126,11 @@ export default async function Dashboard() {
   const online = devices.filter((d) => isOnline(d.last_seen_at)).length;
   const offline = devices.length - online;
   const appOn = devices.filter((d) => isOnline(d.last_seen_at) && d.app_active).length;
+
+  // Geräte mit hinterlegtem Standort für die Karte (Adresse -> Marker).
+  const mapDevices = devices
+    .filter((d: any) => d.location)
+    .map((d: any) => ({ id: d.id, name: d.name, location: d.location as string, online: isOnline(d.last_seen_at) }));
 
   return (
     <div className="container">
@@ -252,6 +258,11 @@ export default async function Dashboard() {
           Preispolitik: 19,90 €/Display · ab 3 Displays 14,90 €/Display. Gleicher Name = ein Kunde
           (keine Dopplung). <strong>Nicht fakturierte</strong> Slots zählen nicht ins MRR.
         </p>
+      </div>
+
+      <div className="card">
+        <h2>Standorte – Salzgitter</h2>
+        <MapCard devices={mapDevices} />
       </div>
 
       <div className="card">
