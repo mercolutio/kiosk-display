@@ -1,11 +1,35 @@
 import { sql } from './db';
 
 // Adresse -> Koordinaten über den freien OpenStreetMap-Geocoder (Nominatim),
-// SERVERSEITIG (mit gültigem User-Agent, ohne CORS, ohne Client). Wird nur zum
-// einmaligen Ermitteln der Position genutzt; die Karte selbst wird ohne externen
-// Anbieter gezeichnet. Auf Salzgitter eingegrenzt (countrycodes + viewbox).
-export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  const q = /salzgitter/i.test(address) ? address : `${address}, Salzgitter`;
+// SERVERSEITIG (mit gültigem User-Agent, ohne CORS). Wird nur zum einmaligen
+// Ermitteln der Position genutzt; die Karte selbst wird ohne Anbieter gezeichnet.
+//
+// Praxis-Problem: Adressen enthalten oft einen Firmennamen vorne dran
+// („autoPRO Autodoktor SZ Marienbruchstraße 72 …") — daran scheitert die Suche.
+// Deshalb werden mehrere Kandidaten probiert: erst ab dem Straßennamen, dann nur
+// PLZ + Ort (sicherer Fallback, mindestens richtiger Stadtteil), dann die ganze
+// Adresse. Der erste Treffer gewinnt.
+
+const SZ_HINT = /salzgitter|lebenstedt|\b382\d\d\b/i; // schon in Salzgitter verortet?
+
+function candidateQueries(address: string): string[] {
+  const a = address.trim().replace(/\s+/g, ' ');
+  const out: string[] = [];
+  // 1) Ab dem Straßennamen bis zum Ende (Firmenname davor wird weggeschnitten).
+  const street = a.match(
+    /([A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\-]*\s+)?[A-Za-zÄÖÜäöüß.\-]*(?:stra(?:ß|ss)e|str\.?|weg|allee|platz|ring|gasse|damm|chaussee)\b.*/i,
+  );
+  if (street) out.push(street[0].trim());
+  // 2) PLZ + Ort — sehr zuverlässig, landet mindestens im richtigen Stadtteil.
+  const plz = a.match(/\b\d{5}\b[,\s]+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.\-]+/);
+  if (plz) out.push(plz[0].replace(/,/g, ' ').replace(/\s+/g, ' ').trim());
+  // 3) Ganze Adresse als letzter Versuch.
+  out.push(a);
+  return [...new Set(out)];
+}
+
+async function nominatim(query: string): Promise<{ lat: number; lng: number } | null> {
+  const q = SZ_HINT.test(query) ? query : `${query}, Salzgitter`;
   const url =
     'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=de' +
     '&viewbox=10.20,52.24,10.52,52.00&q=' + encodeURIComponent(q);
@@ -27,6 +51,14 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
   } catch {
     return null;
   }
+}
+
+export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  for (const q of candidateQueries(address)) {
+    const hit = await nominatim(q);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 // Für Geräte mit Adresse, aber (noch) ohne Koordinaten: Position einmalig

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { sql, ensureSchema } from '@/lib/db';
-import { backfillGeocodes } from '@/lib/geo';
+import { backfillGeocodes, geocodeAddress } from '@/lib/geo';
 import { createDevice, logout } from './actions';
 import AutoRefresh from './auto-refresh';
 import CityMap from './CityMap';
@@ -87,17 +87,13 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   // und ob der Geocoder von Vercel aus überhaupt erreichbar ist ---
   let geoTest = '(aus)';
   if (debug) {
-    try {
-      const r = await fetch(
-        'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=de&q=' +
-          encodeURIComponent('Rathaus, Salzgitter'),
-        { headers: { 'User-Agent': 'kiosk-display/1.0 (fleet.microwerbung.com)', Accept: 'application/json' }, cache: 'no-store' },
-      );
-      const body = await r.text();
-      geoTest = `HTTP ${r.status} · ${body.slice(0, 200)}`;
-    } catch (e) {
-      geoTest = 'fetch-Fehler: ' + (e as Error).message;
+    const lines: string[] = [];
+    for (const d of devices) {
+      if (!d.location) { lines.push(`${d.name}: keine Adresse`); continue; }
+      const c = await geocodeAddress(d.location);
+      lines.push(`${d.name}: ${c ? `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}` : 'KEIN Treffer'}  ←  "${d.location}"`);
     }
+    geoTest = lines.join('\n');
   }
 
   // Konfigurierte Seiten einmal laden — daraus speisen sich „Aktuelle Seite"
