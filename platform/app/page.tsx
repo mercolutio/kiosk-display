@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { sql, ensureSchema } from '@/lib/db';
 import { createDevice, logout } from './actions';
 import AutoRefresh from './auto-refresh';
-import MapCard from './MapCard';
+import CityMap from './CityMap';
 
 export const dynamic = 'force-dynamic';
 
@@ -270,7 +270,11 @@ export default async function Dashboard() {
 
       <div className="card">
         <h2>Standorte – Salzgitter</h2>
-        <MapCard devices={mapDevices} />
+        <CityMap markers={mapDevices} maxWidth={420} emptyHint="Noch keine Standorte – auf der Geräteseite per Klick setzen" />
+        <div className="row" style={{ gap: 14, marginTop: 8, fontSize: 12, justifyContent: 'center' }}>
+          <span className="muted"><span style={{ color: '#34c759' }}>●</span> online</span>
+          <span className="muted"><span style={{ color: '#f99' }}>●</span> offline</span>
+        </div>
       </div>
 
       <div className="card">
