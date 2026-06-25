@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { sql, ensureSchema } from '@/lib/db';
-import { backfillGeocodes, geocodeAddress } from '@/lib/geo';
+import { backfillGeocodes } from '@/lib/geo';
 import { createDevice, logout } from './actions';
 import AutoRefresh from './auto-refresh';
 import CityMap from './CityMap';
@@ -60,8 +60,7 @@ const VOL_FROM = 3;
 const customerRate = (displays: number) => (displays >= VOL_FROM ? PRICE_VOL : PRICE_STD);
 const eur = (v: number) => v.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ debug?: string }> }) {
-  const debug = (await searchParams)?.debug === 'geo';
+export default async function Dashboard() {
   await ensureSchema();
   let devices: any[] = [];
   try {
@@ -81,19 +80,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       `;
       devices = r.rows;
     }
-  }
-
-  // --- temporäre Diagnose (?debug=geo): zeigt gespeicherte Adresse/Koordinaten
-  // und ob der Geocoder von Vercel aus überhaupt erreichbar ist ---
-  let geoTest = '(aus)';
-  if (debug) {
-    const lines: string[] = [];
-    for (const d of devices) {
-      if (!d.location) { lines.push(`${d.name}: keine Adresse`); continue; }
-      const c = await geocodeAddress(d.location);
-      lines.push(`${d.name}: ${c ? `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}` : 'KEIN Treffer'}  ←  "${d.location}"`);
-    }
-    geoTest = lines.join('\n');
   }
 
   // Konfigurierte Seiten einmal laden — daraus speisen sich „Aktuelle Seite"
@@ -162,16 +148,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <button className="btn-sm" type="submit">Abmelden</button>
         </form>
       </div>
-
-      {debug && (
-        <div className="card" style={{ borderColor: '#5a2a2a' }}>
-          <h2>Diagnose Standorte</h2>
-          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>
-            {devices.map((d: any) => `${d.name}: location=${JSON.stringify(d.location ?? null)} lat=${d.lat ?? null} lng=${d.lng ?? null}`).join('\n')
-              + `\n\nGeocode-Test "Rathaus, Salzgitter":\n${geoTest}`}
-          </pre>
-        </div>
-      )}
 
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
