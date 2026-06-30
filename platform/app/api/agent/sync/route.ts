@@ -14,6 +14,11 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Zeitpunkt der letzten fleetweiten Offline-Pruefung (pro Server-Instanz). Damit
+// laeuft die Pruefung hoechstens alle 2 Min statt bei jedem Sync (~alle 15s).
+let lastOfflineCheck = 0;
+const OFFLINE_CHECK_MS = 2 * 60 * 1000;
+
 export async function POST(req: Request) {
   const auth = req.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
@@ -50,10 +55,15 @@ export async function POST(req: Request) {
   try { await sql`update devices set app_active = ${appActive} where id = ${device.id}`; } catch {}
 
   // Offline-Alarm: dieses Geraet ist gerade online -> falls es zuvor als offline
-  // gemeldet war, "wieder online" senden; danach die Flotte auf neu offline
-  // gegangene Geraete pruefen (beide Schritte fehlertolerant).
+  // gemeldet war, sofort "wieder online" senden (bei jedem Sync, guenstig).
   await handleRecovery(device.id);
-  await checkOfflineAndAlert();
+  // Die fleetweite Offline-Pruefung NICHT bei jedem Sync (alle ~15s), sondern
+  // hoechstens alle 2 Min ausfuehren (idempotent -> keine Doppel-Alarme; spart
+  // Schreibzugriffe).
+  if (Date.now() - lastOfflineCheck >= OFFLINE_CHECK_MS) {
+    lastOfflineCheck = Date.now();
+    await checkOfflineAndAlert();
+  }
 
   // Wiedergabe-/Interaktions-Statistik: NICHT mehr bei jedem Sync schreiben,
   // sondern in devices.pending_stats sammeln und nur ~alle 6 Std. (4x/Tag) in
