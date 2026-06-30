@@ -197,6 +197,8 @@ export default async function Dashboard() {
                   : d.location
                   ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(d.location)}`
                   : null;
+                const pinTip = d.location
+                  || (d.lat != null && d.lng != null ? `${Number(d.lat).toFixed(5)}, ${Number(d.lng).toFixed(5)}` : '');
                 return (
                   <tr key={d.id}>
                     <td>
@@ -206,9 +208,12 @@ export default async function Dashboard() {
                           href={pin}
                           target="_blank"
                           rel="noreferrer"
-                          title={d.location ? `Standort: ${d.location}` : 'Standort öffnen'}
+                          className="pin"
                           style={{ marginLeft: 8, textDecoration: 'none' }}
-                        >📍</a>
+                        >
+                          📍
+                          {pinTip && <span className="pin-tip">{pinTip}</span>}
+                        </a>
                       )}
                     </td>
                     <td>

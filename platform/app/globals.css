@@ -39,6 +39,15 @@ pre { padding: 12px; overflow-x: auto; font-size: 12px; }
 code { padding: 1px 5px; font-size: 12px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .error { color: #ff9a9a; font-size: 13px; }
+/* Sofort-Tooltip am 📍-Pin (zeigt die Adresse ohne native Verzögerung). */
+.pin { position: relative; display: inline-block; }
+.pin-tip {
+  display: none; position: absolute; bottom: 135%; left: 50%; transform: translateX(-50%);
+  background: #000; color: #e8e8ea; border: 1px solid #34c759;
+  padding: 5px 9px; border-radius: 7px; font-size: 12px; line-height: 1.3;
+  white-space: nowrap; z-index: 50; box-shadow: 0 4px 14px rgba(0,0,0,.5); pointer-events: none;
+}
+.pin:hover .pin-tip { display: block; }
 /* Aufklappbare Anleitung (Startseite): dezent, mit grünem Dreieck-Toggle. */
 details.guide { margin-top: 14px; border-top: 1px solid #262629; padding-top: 12px; }
 details.guide > summary { cursor: pointer; color: #34c759; font-weight: 600; font-size: 14px; list-style: none; }
