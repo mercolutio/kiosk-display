@@ -76,3 +76,17 @@ create table if not exists site_stats (
   primary key (device_id, url, day)
 );
 create index if not exists site_stats_device_day on site_stats (device_id, day);
+
+-- Hochgeladene Vertraege/Dokumente (z. B. Standortpartner-Vertraege), optional
+-- einem Geraet zugeordnet. Datei liegt in Vercel Blob, hier nur die URL + Metadaten.
+create table if not exists contracts (
+  id            uuid primary key default gen_random_uuid(),
+  name          text not null,
+  url           text not null,                        -- Blob-URL der Datei
+  content_type  text,
+  size          int,
+  note          text,
+  device_id     uuid references devices(id) on delete set null,
+  created_at    timestamptz not null default now()
+);
+create index if not exists contracts_created on contracts (created_at desc);

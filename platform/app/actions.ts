@@ -192,6 +192,31 @@ export async function moveSite(formData: FormData) {
   revalidatePath(`/devices/${deviceId}`);
 }
 
+// ---- Verträge / Dokumente ----
+export async function addContract(formData: FormData) {
+  await ensureSchema();
+  const name = String(formData.get('name') || '').trim();
+  const url = String(formData.get('url') || '').trim();
+  if (!name || !url) return;
+  const note = String(formData.get('note') || '').trim() || null;
+  const deviceId = String(formData.get('device_id') || '').trim() || null;
+  const contentType = String(formData.get('content_type') || '').trim() || null;
+  const size = parseInt(String(formData.get('size') || ''), 10) || null;
+  try {
+    await sql`
+      insert into contracts (name, url, note, device_id, content_type, size)
+      values (${name}, ${url}, ${note}, ${deviceId}, ${contentType}, ${size})
+    `;
+  } catch { /* contracts-Tabelle evtl. noch nicht angelegt */ }
+  revalidatePath('/vertraege');
+}
+
+export async function deleteContract(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  try { await sql`delete from contracts where id = ${id}`; } catch {}
+  revalidatePath('/vertraege');
+}
+
 // ---- Befehle (Fernsteuerung) ----
 export async function enqueueCommand(formData: FormData) {
   const deviceId = String(formData.get('device_id') || '');
