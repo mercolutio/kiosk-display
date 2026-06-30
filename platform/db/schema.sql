@@ -86,6 +86,7 @@ create table if not exists contracts (
   content_type  text,
   size          int,
   note          text,
+  category      text not null default 'blanko',        -- 'blanko' | 'unterschrieben'
   device_id     uuid references devices(id) on delete set null,
   created_at    timestamptz not null default now()
 );

@@ -202,11 +202,16 @@ export async function addContract(formData: FormData) {
   const deviceId = String(formData.get('device_id') || '').trim() || null;
   const contentType = String(formData.get('content_type') || '').trim() || null;
   const size = parseInt(String(formData.get('size') || ''), 10) || null;
+  const cat = String(formData.get('category') || 'blanko').trim();
+  const category = cat === 'unterschrieben' ? 'unterschrieben' : 'blanko';
   try {
-    await sql`
+    const { rows } = await sql`
       insert into contracts (name, url, note, device_id, content_type, size)
       values (${name}, ${url}, ${note}, ${deviceId}, ${contentType}, ${size})
+      returning id
     `;
+    // Kategorie separat -> bricht nicht, falls die Spalte noch nicht migriert ist.
+    try { await sql`update contracts set category = ${category} where id = ${rows[0].id}`; } catch {}
   } catch { /* contracts-Tabelle evtl. noch nicht angelegt */ }
   revalidatePath('/vertraege');
 }
@@ -214,6 +219,15 @@ export async function addContract(formData: FormData) {
 export async function deleteContract(formData: FormData) {
   const id = String(formData.get('id') || '');
   try { await sql`delete from contracts where id = ${id}`; } catch {}
+  revalidatePath('/vertraege');
+}
+
+// Vertrag zwischen "Blanko" und "Unterschrieben" verschieben.
+export async function setContractCategory(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  const cat = String(formData.get('category') || '').trim();
+  const category = cat === 'unterschrieben' ? 'unterschrieben' : 'blanko';
+  try { await sql`update contracts set category = ${category} where id = ${id}`; } catch {}
   revalidatePath('/vertraege');
 }
 
