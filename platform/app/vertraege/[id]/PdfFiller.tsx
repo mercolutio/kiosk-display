@@ -28,6 +28,17 @@ const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js
 const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const PDFLIB = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
 const DISPLAY_SCALE = 1.4; // Anzeige-Pixel pro PDF-Punkt
+const FONT_FAMILY = 'Helvetica, Arial, sans-serif';
+
+// Textbreite messen, damit das Eingabefeld mit dem Inhalt mitwächst.
+let _measCtx: CanvasRenderingContext2D | null = null;
+function measureText(text: string, px: number): number {
+  if (typeof document === 'undefined') return (text.length || 1) * px * 0.55;
+  if (!_measCtx) _measCtx = document.createElement('canvas').getContext('2d');
+  if (!_measCtx) return (text.length || 1) * px * 0.55;
+  _measCtx.font = `${px}px ${FONT_FAMILY}`;
+  return _measCtx.measureText(text).width;
+}
 
 type Field = { id: number; page: number; xFrac: number; yFrac: number; text: string; size: number };
 type PageInfo = { dataUrl: string; wPt: number; hPt: number };
@@ -167,16 +178,20 @@ export default function PdfFiller({ fileUrl, downloadName }: { fileUrl: string; 
             <div key={idx} style={{ position: 'relative', width: dispW, height: dispH, margin: '0 auto 16px', boxShadow: '0 0 0 1px #333', background: '#fff' }}>
               <img src={pg.dataUrl} width={dispW} height={dispH} alt={`Seite ${idx + 1}`} style={{ display: 'block', userSelect: 'none', pointerEvents: 'none' }} />
               <div onClick={(e) => addField(idx, e)} style={{ position: 'absolute', inset: 0, cursor: 'crosshair' }}>
-                {fields.filter((f) => f.page === idx).map((f) => (
-                  <div key={f.id} onClick={(e) => e.stopPropagation()}
-                       style={{ position: 'absolute', left: f.xFrac * 100 + '%', top: f.yFrac * 100 + '%', display: 'inline-flex', alignItems: 'center', gap: 1, background: 'rgba(52,199,89,.10)', border: '1px solid #34c759', borderRadius: 3, whiteSpace: 'nowrap' }}>
-                    <span title="ziehen" onMouseDown={(e) => onDragStart(f.id, e.currentTarget.parentElement!.parentElement!, e)}
-                          style={{ cursor: 'move', padding: '0 3px', color: '#1f8f44', userSelect: 'none', fontSize: 12 }}>⠿</span>
-                    <input value={f.text} onChange={(e) => update(f.id, { text: e.target.value })} autoFocus placeholder="Text…"
-                           style={{ border: 'none', background: 'transparent', color: '#0a0a0a', fontSize: f.size * DISPLAY_SCALE, lineHeight: 1.1, padding: 0, minWidth: 44, outline: 'none' }} />
-                    <span title="entfernen" onClick={() => remove(f.id)} style={{ cursor: 'pointer', color: '#c0392b', padding: '0 4px', userSelect: 'none' }}>×</span>
-                  </div>
-                ))}
+                {fields.filter((f) => f.page === idx).map((f) => {
+                  const px = f.size * DISPLAY_SCALE;
+                  const w = Math.max(46, measureText(f.text || 'Text…', px) + 14);
+                  return (
+                    <div key={f.id} onClick={(e) => e.stopPropagation()}
+                         style={{ position: 'absolute', left: f.xFrac * 100 + '%', top: f.yFrac * 100 + '%', display: 'inline-flex', alignItems: 'center', gap: 1, background: 'rgba(52,199,89,.10)', border: '1px solid #34c759', borderRadius: 3, whiteSpace: 'nowrap' }}>
+                      <span title="ziehen" onMouseDown={(e) => onDragStart(f.id, e.currentTarget.parentElement!.parentElement!, e)}
+                            style={{ cursor: 'move', padding: '0 3px', color: '#1f8f44', userSelect: 'none', fontSize: 12 }}>⠿</span>
+                      <input value={f.text} onChange={(e) => update(f.id, { text: e.target.value })} autoFocus placeholder="Text…"
+                             style={{ border: 'none', background: 'transparent', color: '#0a0a0a', fontFamily: FONT_FAMILY, fontSize: px, lineHeight: 1.1, padding: 0, width: w, outline: 'none' }} />
+                      <span title="entfernen" onClick={() => remove(f.id)} style={{ cursor: 'pointer', color: '#c0392b', padding: '0 4px', userSelect: 'none' }}>×</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
