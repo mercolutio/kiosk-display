@@ -18,6 +18,10 @@ export function ensureSchema(): Promise<void> {
       catch (e) { console.error('[db] ensureSchema devices.lat:', (e as Error).message); }
       try { await sql`alter table devices add column if not exists lng double precision`; }
       catch (e) { console.error('[db] ensureSchema devices.lng:', (e as Error).message); }
+      try { await sql`alter table devices add column if not exists pending_stats jsonb not null default '{}'::jsonb`; }
+      catch (e) { console.error('[db] ensureSchema devices.pending_stats:', (e as Error).message); }
+      try { await sql`alter table devices add column if not exists stats_flushed_at timestamptz`; }
+      catch (e) { console.error('[db] ensureSchema devices.stats_flushed_at:', (e as Error).message); }
     })();
   }
   return schemaReady;
