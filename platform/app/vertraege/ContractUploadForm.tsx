@@ -73,7 +73,11 @@ export default function ContractUploadForm({ devices }: { devices: { id: string;
         {error && <div className="error" style={{ marginTop: 4 }}>{error}</div>}
       </div>
       <input name="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Bezeichnung" required style={{ width: 200 }} />
-      <select name="device_id" defaultValue="" style={{ width: 180 }}>
+      <select name="category" defaultValue="blanko" style={{ width: 150 }}>
+        <option value="blanko">Blanko</option>
+        <option value="unterschrieben">Unterschrieben</option>
+      </select>
+      <select name="device_id" defaultValue="" style={{ width: 170 }}>
         <option value="">— kein Gerät —</option>
         {devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
       </select>

@@ -30,10 +30,13 @@ export function ensureSchema(): Promise<void> {
           content_type  text,
           size          int,
           note          text,
+          category      text not null default 'blanko',  -- 'blanko' | 'unterschrieben'
           device_id     uuid references devices(id) on delete set null,
           created_at    timestamptz not null default now()
         )`;
       } catch (e) { console.error('[db] ensureSchema contracts:', (e as Error).message); }
+      try { await sql`alter table contracts add column if not exists category text not null default 'blanko'`; }
+      catch (e) { console.error('[db] ensureSchema contracts.category:', (e as Error).message); }
     })();
   }
   return schemaReady;
