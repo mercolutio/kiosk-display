@@ -56,6 +56,30 @@ export default function CityMap({
 }) {
   const valid = markers.filter((m) => Number.isFinite(m.lat) && Number.isFinite(m.lng));
 
+  // Ausschnitt + Zoom: bei >=2 Standorten automatisch auf deren Bereich zoomen,
+  // damit die Abstände der Displays sichtbar werden. Im Picker (onPick) bleibt
+  // die Vollansicht, damit man überall klicken kann.
+  let vx = 0, vy = 0, vw = W, vh = H;
+  if (!onPick && valid.length >= 2) {
+    const pts = valid.map((m) => project(m.lng, m.lat));
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of pts) {
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
+    const pad = Math.max(Math.max(maxX - minX, maxY - minY) * 0.6, 34);
+    let x0 = minX - pad, y0 = minY - pad, w0 = maxX - minX + pad * 2, h0 = maxY - minY + pad * 2;
+    const minSpan = W * 0.12;          // nicht zu stark reinzoomen
+    if (w0 < minSpan) { x0 -= (minSpan - w0) / 2; w0 = minSpan; }
+    if (h0 < minSpan) { y0 -= (minSpan - h0) / 2; h0 = minSpan; }
+    const big = Math.max(w0, h0);      // Seitenverhältnis halbwegs ausgewogen halten
+    if (w0 < big * 0.6) { x0 -= (big * 0.6 - w0) / 2; w0 = big * 0.6; }
+    if (h0 < big * 0.6) { y0 -= (big * 0.6 - h0) / 2; h0 = big * 0.6; }
+    // nur zoomen, wenn der Ausschnitt klar kleiner als die ganze Karte ist
+    if (w0 < W * 0.9 && h0 < H * 0.9) { vx = x0; vy = y0; vw = w0; vh = h0; }
+  }
+  const u = vw / W; // Skalierung, damit Marker/Schrift unabhängig vom Zoom gleich groß bleiben
+
   function handleClick(e: React.MouseEvent<SVGSVGElement>) {
     if (!onPick) return;
     const r = e.currentTarget.getBoundingClientRect();
@@ -68,7 +92,7 @@ export default function CityMap({
   return (
     <div style={{ width: '100%', maxWidth, margin: '0 auto' }}>
       <svg
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`${vx} ${vy} ${vw} ${vh}`}
         style={{
           width: '100%',
           height: 'auto',
@@ -81,13 +105,13 @@ export default function CityMap({
         role="img"
         aria-label="Karte von Salzgitter mit Display-Standorten"
       >
-        <path d={RING_PATH} fill="#13251a" stroke="#34c759" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+        <path d={RING_PATH} fill="#13251a" stroke="#34c759" strokeWidth={1.5 * u} strokeLinejoin="round" strokeLinecap="round" />
         {DISTRICTS.map((d) => {
           const [x, y] = project(d.lng, d.lat);
           return (
             <g key={d.name} pointerEvents="none">
-              <circle cx={x} cy={y} r={1.6} fill="#5a6b5f" />
-              <text x={x + 4} y={y + 3} fontSize={8} fill="#7e8d83">{d.name}</text>
+              <circle cx={x} cy={y} r={1.6 * u} fill="#5a6b5f" />
+              <text x={x + 4 * u} y={y + 3 * u} fontSize={8 * u} fill="#7e8d83">{d.name}</text>
             </g>
           );
         })}
@@ -95,10 +119,10 @@ export default function CityMap({
           const [x, y] = project(m.lng, m.lat);
           return (
             <g key={m.id}>
-              <circle cx={x} cy={y} r={6.5} fill={m.online === false ? '#f99' : '#34c759'} stroke="#0a0a0a" strokeWidth={2}>
+              <circle cx={x} cy={y} r={6.5 * u} fill={m.online === false ? '#f99' : '#34c759'} stroke="#0a0a0a" strokeWidth={2 * u}>
                 <title>{m.name}{m.label ? ' — ' + m.label : ''}</title>
               </circle>
-              <text x={x + 10} y={y + 4} fontSize={12} fill="#e8e8ea" stroke="#0b0b0c" strokeWidth={3} style={{ paintOrder: 'stroke' }}>
+              <text x={x + 10 * u} y={y + 4 * u} fontSize={12 * u} fill="#e8e8ea" stroke="#0b0b0c" strokeWidth={3 * u} style={{ paintOrder: 'stroke' }}>
                 {m.name}
               </text>
             </g>
