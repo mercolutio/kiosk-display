@@ -149,9 +149,15 @@ export default async function Dashboard() {
       <AutoRefresh seconds={10} />
       <div className="header">
         <h1>Kiosk-Verwaltung</h1>
-        <form action={logout}>
-          <button className="btn-sm" type="submit">Abmelden</button>
-        </form>
+        <div className="row" style={{ gap: 8 }}>
+          <Link href="/vertraege" className="btn-sm"
+                style={{ border: '1px solid #333', background: '#1d1d20', color: '#eee', padding: '5px 10px', borderRadius: 8, fontSize: 13 }}>
+            📄 Verträge
+          </Link>
+          <form action={logout}>
+            <button className="btn-sm" type="submit">Abmelden</button>
+          </form>
+        </div>
       </div>
 
       {dbError && (

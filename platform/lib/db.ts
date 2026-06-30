@@ -22,6 +22,18 @@ export function ensureSchema(): Promise<void> {
       catch (e) { console.error('[db] ensureSchema devices.pending_stats:', (e as Error).message); }
       try { await sql`alter table devices add column if not exists stats_flushed_at timestamptz`; }
       catch (e) { console.error('[db] ensureSchema devices.stats_flushed_at:', (e as Error).message); }
+      try {
+        await sql`create table if not exists contracts (
+          id            uuid primary key default gen_random_uuid(),
+          name          text not null,
+          url           text not null,
+          content_type  text,
+          size          int,
+          note          text,
+          device_id     uuid references devices(id) on delete set null,
+          created_at    timestamptz not null default now()
+        )`;
+      } catch (e) { console.error('[db] ensureSchema contracts:', (e as Error).message); }
     })();
   }
   return schemaReady;
