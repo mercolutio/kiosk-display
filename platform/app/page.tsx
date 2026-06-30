@@ -61,8 +61,9 @@ const customerRate = (displays: number) => (displays >= VOL_FROM ? PRICE_VOL : P
 const eur = (v: number) => v.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 
 export default async function Dashboard() {
-  await ensureSchema();
+  try { await ensureSchema(); } catch { /* DB evtl. nicht erreichbar */ }
   let devices: any[] = [];
+  let dbError = false;
   try {
     const r = await sql`
       select id, name, last_seen_at, current_site, app_active, location, lat, lng from devices order by created_at asc
@@ -75,10 +76,14 @@ export default async function Dashboard() {
       `;
       devices = r.rows;
     } catch {
-      const r = await sql`
-        select id, name, last_seen_at, current_site from devices order by created_at asc
-      `;
-      devices = r.rows;
+      try {
+        const r = await sql`
+          select id, name, last_seen_at, current_site from devices order by created_at asc
+        `;
+        devices = r.rows;
+      } catch {
+        dbError = true; // Datenbank nicht erreichbar (z. B. Kontingent erschöpft)
+      }
     }
   }
 
@@ -129,7 +134,7 @@ export default async function Dashboard() {
   const appOn = devices.filter((d) => isOnline(d.last_seen_at) && d.app_active).length;
 
   // Geräte mit Adresse, aber ohne Koordinaten einmalig automatisch verorten.
-  await backfillGeocodes(devices);
+  try { await backfillGeocodes(devices); } catch { /* DB/Geocoder evtl. nicht erreichbar */ }
 
   // Geräte mit gesetzten Koordinaten für die Karte (Marker direkt).
   const mapDevices = devices
@@ -148,6 +153,16 @@ export default async function Dashboard() {
           <button className="btn-sm" type="submit">Abmelden</button>
         </form>
       </div>
+
+      {dbError && (
+        <div className="card" style={{ borderColor: '#5a2a2a', background: '#241616' }}>
+          <strong style={{ color: '#ff9a9a' }}>⚠️ Datenbank nicht erreichbar</strong>
+          <p className="muted" style={{ margin: '6px 0 0' }}>
+            Die Daten können gerade nicht geladen werden (häufig: Kontingent der Datenbank erschöpft).
+            Sobald die Datenbank wieder verfügbar ist, erscheinen die Geräte automatisch.
+          </p>
+        </div>
+      )}
 
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
