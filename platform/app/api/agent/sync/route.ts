@@ -145,17 +145,25 @@ export async function POST(req: Request) {
   // Aktivitaets-Log des Agents speichern (best effort; ohne events-Tabelle uebersprungen).
   if (Array.isArray(body.logs) && body.logs.length > 0) {
     try {
+      let inserted = 0;
       for (const e of body.logs.slice(-50)) {
-        if (e && typeof e.message === 'string') {
+        // Redundante "Heartbeat"-Logs nicht speichern: der Online-Status steckt
+        // schon in last_seen_at. Spart Schreibzugriffe und haelt die Aktivitaet
+        // uebersichtlich (echte Ereignisse: Start, Befehle, Fehler ...).
+        if (e && typeof e.message === 'string' && !e.message.startsWith('Heartbeat')) {
           const level = e.level === 'error' || e.level === 'warn' ? e.level : 'info';
           await sql`insert into events (device_id, level, message) values (${device.id}, ${level}, ${e.message})`;
+          inserted++;
         }
       }
-      await sql`
-        delete from events where device_id = ${device.id} and id not in (
-          select id from events where device_id = ${device.id} order by created_at desc limit 200
-        )
-      `;
+      // Nur kuerzen, wenn wirklich etwas geschrieben wurde (kein DELETE bei reinen Heartbeats).
+      if (inserted > 0) {
+        await sql`
+          delete from events where device_id = ${device.id} and id not in (
+            select id from events where device_id = ${device.id} order by created_at desc limit 200
+          )
+        `;
+      }
     } catch {
       /* events-Tabelle evtl. noch nicht angelegt -> ignorieren */
     }
