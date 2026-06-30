@@ -48,6 +48,9 @@ code { padding: 1px 5px; font-size: 12px; }
   white-space: nowrap; z-index: 50; box-shadow: 0 4px 14px rgba(0,0,0,.5); pointer-events: none;
 }
 .pin:hover .pin-tip { display: block; }
+/* Animierte „Fluss"-Verbindungslinien zwischen den Display-Standorten (Netzwerkeffekt). */
+@keyframes mw-flow { to { stroke-dashoffset: -14; } }
+.mw-flow { animation: mw-flow 1s linear infinite; filter: drop-shadow(0 0 2px rgba(52, 199, 89, .85)); }
 /* Aufklappbare Anleitung (Startseite): dezent, mit grünem Dreieck-Toggle. */
 details.guide { margin-top: 14px; border-top: 1px solid #262629; padding-top: 12px; }
 details.guide > summary { cursor: pointer; color: #34c759; font-weight: 600; font-size: 14px; list-style: none; }

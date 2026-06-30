@@ -39,11 +39,22 @@ export default function MapCard({ devices }: { devices: MapDevice[] }) {
         attribution: '&copy; OpenStreetMap',
       }).addTo(map);
 
-      const pts: [number, number][] = [];
-      for (const d of devicesRef.current) {
-        if (!isFinite(d.lat) || !isFinite(d.lng)) continue;
-        const c: [number, number] = [d.lat, d.lng];
-        L.circleMarker(c, {
+      const devs = devicesRef.current.filter((d) => isFinite(d.lat) && isFinite(d.lng));
+      const pts: [number, number][] = devs.map((d) => [d.lat, d.lng] as [number, number]);
+
+      // Verbindungslinien zwischen allen Standorten (Netzwerkeffekt): eine dezente
+      // Basislinie + eine animierte grüne „Fluss"-Linie. Zuerst zeichnen, damit die
+      // Marker darüber liegen.
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const seg: [number, number][] = [pts[i], pts[j]];
+          L.polyline(seg, { color: '#34c759', weight: 1.5, opacity: 0.3, interactive: false }).addTo(map);
+          L.polyline(seg, { color: '#34c759', weight: 2.5, opacity: 0.95, lineCap: 'round', dashArray: '2 12', className: 'mw-flow', interactive: false }).addTo(map);
+        }
+      }
+
+      for (const d of devs) {
+        L.circleMarker([d.lat, d.lng] as [number, number], {
           radius: 9,
           color: '#0a0a0a',
           weight: 2,
@@ -52,7 +63,6 @@ export default function MapCard({ devices }: { devices: MapDevice[] }) {
         })
           .addTo(map)
           .bindPopup(`<strong>${escapeHtml(d.name)}</strong>${d.label ? '<br>' + escapeHtml(d.label) : ''}`);
-        pts.push(c);
       }
       if (cancelled) return;
       // Auto-Zoom auf die Standorte (maxZoom begrenzt, damit nah beieinander
