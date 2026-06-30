@@ -70,9 +70,10 @@ export default function LocationPicker({
       const startCenter = coords || SALZGITTER;
       const map = L.map(ref.current, { scrollWheelZoom: false }).setView(startCenter, coords ? 16 : 12);
       mapRef.current = map;
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap',
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
       }).addTo(map);
       if (coords) ensureMarker(coords);
       map.on('click', (e: any) => place([e.latlng.lat, e.latlng.lng]));

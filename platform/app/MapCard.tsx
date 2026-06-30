@@ -34,9 +34,12 @@ export default function MapCard({ devices }: { devices: MapDevice[] }) {
       const L = await loadLeaflet().catch(() => null);
       if (!L || cancelled || !ref.current) { if (!cancelled) setStatus('error'); return; }
       map = L.map(ref.current, { scrollWheelZoom: false }).setView(SALZGITTER, 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      // Dunkler Kartenstil (CARTO dark) — lässt die grüne Linie strahlen und passt
+      // zum dunklen Dashboard; Straßennamen bleiben lesbar.
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap',
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
       }).addTo(map);
 
       const devs = devicesRef.current.filter((d) => isFinite(d.lat) && isFinite(d.lng));
@@ -96,7 +99,7 @@ export default function MapCard({ devices }: { devices: MapDevice[] }) {
       <div className="row" style={{ gap: 14, marginTop: 8, fontSize: 12 }}>
         <span className="muted"><span style={{ color: '#34c759' }}>●</span> online</span>
         <span className="muted"><span style={{ color: '#f99' }}>●</span> offline</span>
-        <span className="muted">Karte © OpenStreetMap</span>
+        <span className="muted">Karte © OpenStreetMap, © CARTO</span>
       </div>
     </div>
   );
