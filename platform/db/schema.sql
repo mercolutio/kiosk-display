@@ -21,6 +21,8 @@ create table if not exists devices (
   location         text,                             -- optionale Standort-Bezeichnung (Adresse/Ladenname, fuers Popup)
   lat              double precision,                  -- Standort-Koordinaten, per Klick auf der Karte gesetzt
   lng              double precision,
+  pending_stats    jsonb not null default '{}'::jsonb, -- gesammelte Statistik zwischen den Flushes (Anzeigezeit/Interaktionen)
+  stats_flushed_at timestamptz,                       -- letzter Schreibvorgang in site_stats (Flush ~alle 6h)
   created_at       timestamptz not null default now()
 );
 

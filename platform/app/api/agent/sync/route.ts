@@ -7,7 +7,7 @@
 //   { device, config: { rotationInterval, idleTimeout, screenOnTime,
 //                        screenOffTime, sites: [{url,name,duration?}] },
 //     commands: [{ id, type }] }
-import { sql } from '@/lib/db';
+import { sql, ensureSchema } from '@/lib/db';
 import { handleRecovery, checkOfflineAndAlert } from '@/lib/alerts';
 import { NextResponse } from 'next/server';
 
@@ -28,6 +28,7 @@ export async function POST(req: Request) {
   if (!device) {
     return NextResponse.json({ error: 'invalid token' }, { status: 401 });
   }
+  try { await ensureSchema(); } catch { /* DB evtl. nicht erreichbar */ }
 
   let body: any = {};
   try {
@@ -54,53 +55,76 @@ export async function POST(req: Request) {
   await handleRecovery(device.id);
   await checkOfflineAndAlert();
 
-  // Wiedergabe-Statistik: die seit dem letzten Heartbeat vergangene Zeit der
-  // aktuell gemeldeten Seite gutschreiben (Sampling). Lange Luecken (offline)
-  // werden ignoriert, damit nur echte Anzeigezeit zaehlt. (device.* sind hier
-  // noch die VORHERIGEN Werte vor dem Update oben.)
+  // Wiedergabe-/Interaktions-Statistik: NICHT mehr bei jedem Sync schreiben,
+  // sondern in devices.pending_stats sammeln und nur ~alle 6 Std. (4x/Tag) in
+  // die site_stats-Tabelle schreiben. (device.* sind hier noch die VORHERIGEN
+  // Werte von vor dem Heartbeat-Update oben.)
+  const STATS_FLUSH_MS = 6 * 60 * 60 * 1000;
+  const pending: Record<string, any> =
+    device.pending_stats && typeof device.pending_stats === 'object' ? { ...device.pending_stats } : {};
+  const bump = (url: string, field: string, amount: number) => {
+    if (!amount) return;
+    if (!pending[url]) pending[url] = { seconds: 0, views: 0, pauses: 0, pause_seconds: 0 };
+    pending[url][field] = (pending[url][field] || 0) + amount;
+  };
+
+  // Anzeigezeit seit dem letzten Heartbeat der aktuellen Seite gutschreiben
+  // (Sampling). Lange Luecken (offline) werden ignoriert.
   if (currentSite) {
     const prevSeenMs = device.last_seen_at ? new Date(device.last_seen_at).getTime() : 0;
     const elapsedSec = prevSeenMs ? Math.round((Date.now() - prevSeenMs) / 1000) : 0;
     if (elapsedSec > 0 && elapsedSec <= 60) {
-      const isNewView = currentSite !== device.current_site ? 1 : 0;
-      try {
-        // Nur konfigurierte Seiten zaehlen -> Start-/Default-Seiten oder manuell
-        // angesteuerte Fremdseiten verfaelschen die Statistik nicht.
-        await sql`
-          insert into site_stats (device_id, url, day, seconds, views)
-          select ${device.id}, ${currentSite}, current_date, ${elapsedSec}, ${isNewView}
-           where exists (select 1 from sites where device_id = ${device.id} and url = ${currentSite})
-          on conflict (device_id, url, day) do update
-            set seconds = site_stats.seconds + ${elapsedSec},
-                views   = site_stats.views   + ${isNewView}
-        `;
-      } catch {
-        /* site_stats-Tabelle evtl. noch nicht migriert -> ignorieren */
-      }
+      bump(currentSite, 'seconds', elapsedSec);
+      if (currentSite !== device.current_site) bump(currentSite, 'views', 1);
     }
   }
-
-  // Interaktions-Statistik (Timer-Stopps durch Bedienung): Deltas vom Agent den
-  // konfigurierten Seiten gutschreiben (Haeufigkeit + Gesamtdauer).
+  // Interaktions-Deltas (Timer-Stopps durch Bedienung) dazurechnen.
   if (Array.isArray(body.interactions)) {
     for (const it of body.interactions) {
       if (!it || typeof it.url !== 'string') continue;
-      const count = Number.isFinite(it.count) ? Math.max(0, Math.round(it.count)) : 0;
-      const pauseSec = Number.isFinite(it.ms) ? Math.max(0, Math.round(it.ms / 1000)) : 0;
-      if (count === 0 && pauseSec === 0) continue;
-      try {
-        await sql`
-          insert into site_stats (device_id, url, day, pauses, pause_seconds)
-          select ${device.id}, ${it.url}, current_date, ${count}, ${pauseSec}
-           where exists (select 1 from sites where device_id = ${device.id} and url = ${it.url})
-          on conflict (device_id, url, day) do update
-            set pauses = site_stats.pauses + ${count},
-                pause_seconds = site_stats.pause_seconds + ${pauseSec}
-        `;
-      } catch {
-        /* Spalten pauses/pause_seconds evtl. noch nicht migriert -> ignorieren */
-      }
+      bump(it.url, 'pauses', Number.isFinite(it.count) ? Math.max(0, Math.round(it.count)) : 0);
+      bump(it.url, 'pause_seconds', Number.isFinite(it.ms) ? Math.max(0, Math.round(it.ms / 1000)) : 0);
     }
+  }
+
+  // Flush faellig? (erst wenn der 6h-Timer laeuft UND abgelaufen ist)
+  const lastFlush = device.stats_flushed_at ? new Date(device.stats_flushed_at).getTime() : null;
+  const flushDue = lastFlush !== null && Date.now() - lastFlush >= STATS_FLUSH_MS;
+
+  let flushed = false;
+  if (flushDue && Object.keys(pending).length > 0) {
+    try {
+      for (const [url, s] of Object.entries(pending)) {
+        const sec = s.seconds || 0, views = s.views || 0, pauses = s.pauses || 0, ps = s.pause_seconds || 0;
+        if (!sec && !views && !pauses && !ps) continue;
+        // Nur konfigurierte Seiten zaehlen -> Fremd-/Startseiten verfaelschen die Statistik nicht.
+        await sql`
+          insert into site_stats (device_id, url, day, seconds, views, pauses, pause_seconds)
+          select ${device.id}, ${url}, current_date, ${sec}, ${views}, ${pauses}, ${ps}
+           where exists (select 1 from sites where device_id = ${device.id} and url = ${url})
+          on conflict (device_id, url, day) do update
+            set seconds = site_stats.seconds + ${sec},
+                views = site_stats.views + ${views},
+                pauses = site_stats.pauses + ${pauses},
+                pause_seconds = site_stats.pause_seconds + ${ps}`;
+      }
+      flushed = true;
+    } catch {
+      flushed = false; // beim naechsten Mal erneut versuchen (pending bleibt erhalten)
+    }
+  }
+
+  // pending_stats / Flush-Zeitpunkt speichern (fehlertolerant -> bricht den Sync nie).
+  try {
+    if (flushed) {
+      await sql`update devices set pending_stats = '{}'::jsonb, stats_flushed_at = now() where id = ${device.id}`;
+    } else if (lastFlush === null) {
+      await sql`update devices set pending_stats = ${JSON.stringify(pending)}::jsonb, stats_flushed_at = now() where id = ${device.id}`;
+    } else {
+      await sql`update devices set pending_stats = ${JSON.stringify(pending)}::jsonb where id = ${device.id}`;
+    }
+  } catch {
+    /* Spalten pending_stats/stats_flushed_at evtl. noch nicht migriert -> ignorieren */
   }
 
   // Vom Agent ausgefuehrte Befehle quittieren.
