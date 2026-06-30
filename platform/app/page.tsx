@@ -3,7 +3,7 @@ import { sql, ensureSchema } from '@/lib/db';
 import { backfillGeocodes } from '@/lib/geo';
 import { createDevice, logout } from './actions';
 import AutoRefresh from './auto-refresh';
-import CityMap from './CityMap';
+import MapCard from './MapCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -300,11 +300,7 @@ export default async function Dashboard() {
 
       <div className="card">
         <h2>Standorte – Salzgitter</h2>
-        <CityMap markers={mapDevices} maxWidth={420} emptyHint="Noch keine Standorte – auf der Geräteseite per Klick setzen" />
-        <div className="row" style={{ gap: 14, marginTop: 8, fontSize: 12, justifyContent: 'center' }}>
-          <span className="muted"><span style={{ color: '#34c759' }}>●</span> online</span>
-          <span className="muted"><span style={{ color: '#f99' }}>●</span> offline</span>
-        </div>
+        <MapCard devices={mapDevices} />
       </div>
 
       <div className="card">
