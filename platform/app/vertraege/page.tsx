@@ -11,7 +11,7 @@ function fmtSize(n: number | null): string {
   return Math.max(1, Math.round(n / 1024)) + ' KB';
 }
 
-function ContractTable({ rows, moveTo }: { rows: any[]; moveTo: 'blanko' | 'unterschrieben' }) {
+function ContractTable({ rows, moveTo, fillable }: { rows: any[]; moveTo: 'blanko' | 'unterschrieben'; fillable?: boolean }) {
   if (rows.length === 0) return <p className="muted">Noch keine Dokumente.</p>;
   const moveText = moveTo === 'unterschrieben' ? '→ Unterschr.' : '→ Blanko';
   const moveTitle = moveTo === 'unterschrieben' ? 'nach „Unterschrieben" verschieben' : 'nach „Blanko" verschieben';
@@ -32,6 +32,12 @@ function ContractTable({ rows, moveTo }: { rows: any[]; moveTo: 'blanko' | 'unte
             <td className="muted">{new Date(c.created_at).toLocaleDateString('de-DE')}</td>
             <td>
               <div className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                {fillable && ((c.content_type || '').includes('pdf') || /\.pdf(\?|$)/i.test(c.url || '') || /\.pdf$/i.test(c.name || '')) && (
+                  <Link href={`/vertraege/${c.id}`} title="im Browser ausfüllen"
+                        style={{ border: '1px solid #34c759', color: '#34c759', padding: '3px 8px', borderRadius: 8, fontSize: 12, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                    ✏️ Ausfüllen
+                  </Link>
+                )}
                 <form action={setContractCategory}>
                   <input type="hidden" name="id" value={c.id} />
                   <input type="hidden" name="category" value={moveTo} />
@@ -79,7 +85,7 @@ export default async function Vertraege() {
 
       <div className="card">
         <h2>Blanko ({blanko.length})</h2>
-        <ContractTable rows={blanko} moveTo="unterschrieben" />
+        <ContractTable rows={blanko} moveTo="unterschrieben" fillable />
       </div>
 
       <div className="card">
