@@ -290,7 +290,6 @@
   </div>
 
   <div id="webviewContainer">
-    <webview id="webview" src="about:blank" nodeintegration useragent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"></webview>
     <img id="mediaImg" style="display:none; width:100%; height:100%; object-fit:contain; background:#000;" />
     <video id="mediaVid" style="display:none; width:100%; height:100%; object-fit:contain; background:#000;" muted loop playsinline></video>
   </div>
@@ -304,10 +303,13 @@
   </div>
 
   <script>
-    const webview = document.getElementById('webview');
-    // Preload-Script fuer Scroll-Simulation setzen (braucht absoluten Pfad)
     const path = require('path');
-    webview.setAttribute('preload', 'file://' + path.join(__dirname, 'webview-preload.js'));
+    // Jede Webseite bekommt einen EIGENEN Webview, der beim Start vorgeladen wird.
+    // Beim Wechsel wird nur ein-/ausgeblendet -> kein Nachladen, nahtlos.
+    const WEBVIEW_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+    const WEBVIEW_PRELOAD = 'file://' + path.join(__dirname, 'webview-preload.js');
+    const webviews = {};        // index -> <webview> (persistent, nur fuer type 'web')
+    let activeWebview = null;
     const webviewContainer = document.getElementById('webviewContainer');
     const mediaImg = document.getElementById('mediaImg');
     const mediaVid = document.getElementById('mediaVid');
@@ -359,12 +361,29 @@
       });
     }
 
-    // Zwischen Webview / Bild / Video umschalten (jeweils nur eins sichtbar).
+    // Bild/Video umschalten (Webviews werden ueber showWeb geregelt).
     function showMedia(kind) {
-      webview.style.display = kind === 'web' ? '' : 'none';
+      hideAllWebviews();
+      activeWebview = null;
       mediaImg.style.display = kind === 'image' ? '' : 'none';
       mediaVid.style.display = kind === 'video' ? '' : 'none';
       if (kind !== 'video') { try { mediaVid.pause(); } catch (e) {} }
+    }
+
+    // Den vorgeladenen Webview einer Seite zeigen — kein Nachladen, sofort da.
+    function showWeb(index) {
+      mediaImg.style.display = 'none';
+      mediaVid.style.display = 'none';
+      try { mediaVid.pause(); } catch (e) {}
+      hideAllWebviews();
+      const wv = webviews[index];
+      activeWebview = wv || null;
+      if (wv) {
+        wv.style.display = '';
+        lastScrollY = -1;
+        if (wv.__loaded) loadingScreen.classList.add('hidden');
+        else loadingScreen.classList.remove('hidden');   // erste Ladung (Tagesstart)
+      }
     }
 
     function loadSite(index) {
@@ -391,9 +410,7 @@
         if (mediaVid.readyState >= 3) loadingScreen.classList.add('hidden');
       } else {
         try { siteName.textContent = new URL(site.url).hostname; } catch (e) { siteName.textContent = site.name; }
-        showMedia('web');
-        loadingScreen.classList.remove('hidden');
-        webview.src = site.url;
+        showWeb(index);
       }
     }
 
@@ -471,13 +488,15 @@
     document.getElementById('btnPrev').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); prevSite(); }, { passive: false });
     document.getElementById('btnNext').addEventListener('touchstart', (e) => { e.preventDefault(); onInteraction(); nextSite(); }, { passive: false });
 
-    // Interaktionen im Webview erkennen + Cookie-Banner entfernen
-    webview.addEventListener('dom-ready', () => {
-      loadingScreen.classList.add('hidden');
-
+    // Einen (vorgeladenen) Webview einrichten: Cookie-Banner entfernen, Scrollbar
+    // sichtbar machen, Interaktionen melden. Wird pro Webview einmal aufgerufen.
+    function setupWebview(wv) {
+    wv.addEventListener('dom-ready', () => {
+      wv.__loaded = true;
+      if (wv === activeWebview) { loadingScreen.classList.add('hidden'); lastScrollY = -1; }
 
       // Cookie-Banner entfernen und Akzeptieren-Buttons klicken
-      webview.executeJavaScript(`try {
+      wv.executeJavaScript(`try {
         (function() {
           // Bekannte Cookie-Banner Selektoren (CSS)
           const bannerSelectors = [
@@ -591,16 +610,42 @@
       `).catch(function(){});
 
       // Scrollbar sichtbar machen + scroll-behavior fix
-      try { webview.insertCSS('::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}html,body{overflow-y:auto!important;scroll-behavior:auto!important}'); } catch(e) {}
+      try { wv.insertCSS('::-webkit-scrollbar{width:20px!important;background:#111!important}::-webkit-scrollbar-thumb{background:#c8ff00!important;border-radius:10px!important;border:3px solid #111!important}::-webkit-scrollbar-thumb:active{background:#fff!important}html,body{overflow-y:auto!important;scroll-behavior:auto!important}'); } catch(e) {}
     });
 
-    // Scroll-Simulation laeuft jetzt ueber webview-preload.js
-
-    // IPC Messages vom Webview empfangen
-    webview.addEventListener('console-message', (e) => {
+    // Interaktionen (Scroll-Simulation laeuft ueber webview-preload.js). Nur vom
+    // aktuell sichtbaren Webview melden.
+    wv.addEventListener('console-message', (e) => {
+      if (wv !== activeWebview) return;
       if (e.message === 'KIOSK:interaction') onInteraction();
       if (e.message.startsWith('KIOSK:')) console.log('[webview] ' + e.message);
     });
+    }
+
+    // Persistenten Webview fuer eine Webseite anlegen (beim Start vorgeladen).
+    function createWebview(url) {
+      const wv = document.createElement('webview');
+      wv.setAttribute('src', url);
+      wv.setAttribute('nodeintegration', '');
+      wv.setAttribute('useragent', WEBVIEW_UA);
+      wv.setAttribute('preload', WEBVIEW_PRELOAD);
+      wv.style.display = 'none';
+      wv.__loaded = false;
+      setupWebview(wv);
+      webviewContainer.appendChild(wv);
+      return wv;
+    }
+
+    // Alle Webseiten der Konfiguration einmal vorladen.
+    function buildWebviews() {
+      config.sites.forEach((s, i) => {
+        if ((s.type || 'web') === 'web' && s.url) webviews[i] = createWebview(s.url);
+      });
+    }
+
+    function hideAllWebviews() {
+      for (const k in webviews) webviews[k].style.display = 'none';
+    }
 
     // Scroll-Erkennung per Polling der Webview-Scrollposition
     let lastScrollY = -1;
@@ -609,8 +654,9 @@
     function startScrollPolling() {
       if (scrollPollInterval) return;
       scrollPollInterval = setInterval(async () => {
+        if (!activeWebview) return;
         try {
-          const y = await webview.executeJavaScript('window.scrollY');
+          const y = await activeWebview.executeJavaScript('window.scrollY');
           if (lastScrollY !== -1 && y !== lastScrollY) {
             onInteraction();
           }
@@ -618,11 +664,6 @@
         } catch (e) {}
       }, 150);
     }
-
-    webview.addEventListener('dom-ready', () => {
-      lastScrollY = -1;
-      startScrollPolling();
-    });
 
     // Timer-Loop (jede 0.5 Sekunden)
     function startTimerLoop() {
@@ -686,6 +727,8 @@
       }
       loadingScreen.classList.add('hidden');
       preloadMedia(config);
+      buildWebviews();          // alle Webseiten vorladen (Tagesstart) -> nahtlose Wechsel
+      startScrollPolling();
       initDots();
       loadSite(0);
       startTimerLoop();
@@ -763,7 +806,7 @@
 
     function typeChar(ch) {
       const char = (kbShift || kbCaps) ? (shiftMap[ch] || ch.toUpperCase()) : ch;
-      webview.executeJavaScript(`
+      activeWebview && activeWebview.executeJavaScript(`
         (function() {
           const el = document.activeElement;
           if (!el) return;
@@ -785,7 +828,7 @@
     }
 
     function sendBackspace() {
-      webview.executeJavaScript(`
+      activeWebview && activeWebview.executeJavaScript(`
         (function() {
           const el = document.activeElement;
           if (!el) return;
@@ -806,7 +849,7 @@
     }
 
     function sendEnter() {
-      webview.executeJavaScript(`
+      activeWebview && activeWebview.executeJavaScript(`
         (function() {
           const el = document.activeElement;
           if (!el) return;
@@ -828,16 +871,16 @@
     function hideKeyboard() {
       keyboard.classList.remove('visible');
       webviewContainer.style.height = '';
-      webview.executeJavaScript(`if (document.activeElement) document.activeElement.blur();`);
+      activeWebview && activeWebview.executeJavaScript(`if (document.activeElement) document.activeElement.blur();`);
     }
 
     // Input-Fokus per Polling erkennen
     let inputFocused = false;
 
     setInterval(async () => {
-      if (!webview.src || webview.src === 'about:blank') return;
+      if (!activeWebview) return;
       try {
-        const tag = await webview.executeJavaScript(
+        const tag = await activeWebview.executeJavaScript(
           `(function(){ const el = document.activeElement; if (!el) return ''; return el.tagName + '|' + el.type; })()`
         );
         const isInput = tag && (
