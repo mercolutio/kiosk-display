@@ -91,3 +91,68 @@ create table if not exists contracts (
   created_at    timestamptz not null default now()
 );
 create index if not exists contracts_created on contracts (created_at desc);
+
+-- Rechnungsmodul: eigene Firmendaten (genau eine Zeile, id = 1).
+create table if not exists company_settings (
+  id             int primary key default 1 check (id = 1),
+  name           text,
+  owner          text,
+  street         text,
+  zip            text,
+  city           text,
+  country        text not null default 'DE',
+  email          text,
+  phone          text,
+  website        text,
+  tax_number     text,                              -- Steuernummer
+  vat_id         text,                              -- USt-IdNr.
+  iban           text,
+  bic            text,
+  bank_name      text,
+  small_business boolean not null default false,    -- § 19 UStG (keine USt)
+  payment_days   int not null default 14,
+  invoice_prefix text not null default 'RE',
+  invoice_footer text,
+  updated_at     timestamptz not null default now()
+);
+
+-- Rechnungen: Empfaengerdaten als Schnappschuss (Rechnungsinhalt bleibt stabil,
+-- auch wenn sich Stammdaten spaeter aendern). Betraege werden beim Speichern
+-- aus den Positionen berechnet.
+create table if not exists invoices (
+  id             uuid primary key default gen_random_uuid(),
+  number         text not null unique,
+  status         text not null default 'draft' check (status in ('draft','sent','paid','cancelled')),
+  issue_date     date not null default current_date,
+  due_date       date,
+  service_start  date,                               -- Leistungszeitraum
+  service_end    date,
+  c_name         text not null,
+  c_contact      text,
+  c_street       text,
+  c_zip          text,
+  c_city         text,
+  c_country      text not null default 'DE',
+  c_email        text,
+  c_vat_id       text,
+  c_reference    text,                               -- Kaeufer-Referenz / Leitweg-ID (BT-10)
+  note           text,
+  small_business boolean not null default false,
+  net_total      numeric(12,2) not null default 0,
+  tax_total      numeric(12,2) not null default 0,
+  gross_total    numeric(12,2) not null default 0,
+  paid_at        date,
+  created_at     timestamptz not null default now()
+);
+
+create table if not exists invoice_items (
+  id          uuid primary key default gen_random_uuid(),
+  invoice_id  uuid not null references invoices(id) on delete cascade,
+  position    int not null default 0,
+  description text not null,
+  quantity    numeric(12,2) not null default 1,
+  unit        text not null default 'C62',           -- UN/ECE-Einheit: C62 Stk, MON Monat, HUR Std, DAY Tag
+  unit_price  numeric(12,2) not null default 0,
+  vat_rate    numeric(5,2) not null default 19
+);
+create index if not exists invoice_items_invoice on invoice_items (invoice_id, position);
