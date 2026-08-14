@@ -150,6 +150,10 @@ export default async function Dashboard() {
       <div className="header">
         <h1>Kiosk-Verwaltung</h1>
         <div className="row" style={{ gap: 8 }}>
+          <Link href="/rechnungen" className="btn-sm"
+                style={{ border: '1px solid #333', background: '#1d1d20', color: '#eee', padding: '5px 10px', borderRadius: 8, fontSize: 13 }}>
+            🧾 Rechnungen
+          </Link>
           <Link href="/vertraege" className="btn-sm"
                 style={{ border: '1px solid #333', background: '#1d1d20', color: '#eee', padding: '5px 10px', borderRadius: 8, fontSize: 13 }}>
             📄 Verträge
