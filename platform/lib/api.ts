@@ -6,15 +6,24 @@ import { timingSafeEqual } from 'crypto';
 // Prüft den API-Key. Gibt eine Fehler-Response zurück, wenn nicht autorisiert,
 // sonst null (= weitermachen). Key per Header `Authorization: Bearer <key>`
 // oder Query `?api_key=<key>`.
+// Gültig sind KIOSK_API_KEY und zusätzlich alle Einträge in KIOSK_API_KEYS
+// (kommagetrennt) — so bekommt jeder Client (z. B. WhatsApp-Assistent) einen
+// eigenen Key, der einzeln widerrufen werden kann.
 export function requireApi(request: Request): NextResponse | null {
-  const key = process.env.KIOSK_API_KEY;
-  if (!key) return err('API nicht konfiguriert: KIOSK_API_KEY fehlt', 503);
+  const keys = [
+    process.env.KIOSK_API_KEY || '',
+    ...(process.env.KIOSK_API_KEYS || '').split(','),
+  ].map((k) => k.trim()).filter(Boolean);
+  if (keys.length === 0) return err('API nicht konfiguriert: KIOSK_API_KEY fehlt', 503);
   const auth = request.headers.get('authorization') || '';
   const m = auth.match(/^Bearer\s+(.+)$/i);
   const provided = (m ? m[1] : new URL(request.url).searchParams.get('api_key')) || '';
   const a = Buffer.from(provided);
-  const b = Buffer.from(key);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return err('nicht autorisiert', 401);
+  const valid = keys.some((k) => {
+    const b = Buffer.from(k);
+    return a.length === b.length && timingSafeEqual(a, b);
+  });
+  if (!valid) return err('nicht autorisiert', 401);
   return null;
 }
 
