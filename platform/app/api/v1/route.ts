@@ -24,7 +24,17 @@ export async function GET(request: Request) {
       'GET    /api/v1/devices/{id}/commands': 'letzte Befehle',
       'POST   /api/v1/devices/{id}/commands': 'Befehl senden { type: start_app|stop_app|restart_app|reboot|reload_config }',
       'GET    /api/v1/devices/{id}/stats?days=7': 'Wiedergabe-/Interaktions-Statistik',
+      'GET    /api/v1/devices/{id}/events?limit=50': 'Ereignis-Log des Geräts',
       'POST   /api/v1/media?filename=...': 'Datei (Bild/Video) als Roh-Body hochladen -> { url }',
+      'GET    /api/v1/summary': 'Gesamtübersicht: Geräte, Kunden/MRR, Rechnungen (für Assistenten)',
+      'GET    /api/v1/invoices': 'Rechnungen auflisten',
+      'POST   /api/v1/invoices': 'Rechnung als Entwurf anlegen { buyer, items, ... }',
+      'GET    /api/v1/invoices/{id}': 'Rechnung inkl. Positionen',
+      'PATCH  /api/v1/invoices/{id}': 'Status ändern { status: sent|paid|cancelled|draft }',
+      'DELETE /api/v1/invoices/{id}': 'Entwurf/Storno löschen',
+      'GET    /api/v1/invoices/{id}/file?format=pdf|xrechnung': 'Rechnungs-PDF bzw. E-Rechnung (XML)',
+      'GET    /api/v1/contracts?category=': 'Verträge/Dokumente auflisten',
     },
+    docs: 'siehe platform/API.md im Repository',
   });
 }
