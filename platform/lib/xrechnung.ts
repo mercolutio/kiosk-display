@@ -87,12 +87,18 @@ export function buildXRechnung(inv: Invoice, items: InvoiceItem[], company: Comp
   const lines = items.map((it, i) => {
     const lineNet = round2(it.quantity * it.unit_price);
     const rate = kleinunternehmer ? 0 : it.vat_rate;
+    // Mehrzeilige Beschreibung: erste Zeile = Artikelname (BT-153),
+    // restliche Zeilen = Artikelbeschreibung (BT-154).
+    const [nameLine, ...restLines] = (it.description || '').split('\n');
+    const itemName = (nameLine || '').trim().slice(0, 100) || 'Position';
+    const itemDesc = restLines.join('\n').trim();
     return `  <cac:InvoiceLine>
     <cbc:ID>${i + 1}</cbc:ID>
     <cbc:InvoicedQuantity unitCode="${esc(it.unit || 'C62')}">${qty(it.quantity)}</cbc:InvoicedQuantity>
     <cbc:LineExtensionAmount currencyID="${currency}">${amt(lineNet)}</cbc:LineExtensionAmount>
-    <cac:Item>
-      <cbc:Name>${esc(it.description.slice(0, 100) || 'Position')}</cbc:Name>
+    <cac:Item>${itemDesc ? `
+      <cbc:Description>${esc(itemDesc)}</cbc:Description>` : ''}
+      <cbc:Name>${esc(itemName)}</cbc:Name>
       <cac:ClassifiedTaxCategory>
         <cbc:ID>${catFor(it.vat_rate)}</cbc:ID>
         <cbc:Percent>${qty(rate)}</cbc:Percent>

@@ -242,9 +242,11 @@ export default function InvoiceForm(props: {
           return (
             <div key={i} className="row" style={{ alignItems: 'flex-end', marginBottom: 8 }}>
               <div style={{ flex: 1, minWidth: 260 }}>
-                <label>Beschreibung</label>
-                <input value={it.description} onChange={(e) => setItem(i, { description: e.target.value })}
-                       placeholder="z. B. Microwerbung – digitale Werbeanzeige …" style={{ width: '100%', ...inp }} />
+                <label>Beschreibung (mehrzeilig möglich)</label>
+                <textarea value={it.description} onChange={(e) => setItem(i, { description: e.target.value })}
+                          rows={Math.min(6, Math.max(1, it.description.split('\n').length))}
+                          placeholder="z. B. Microwerbung – digitale Werbeanzeige …"
+                          style={{ width: '100%', resize: 'vertical', ...inp }} />
               </div>
               <div style={{ width: 70 }}>
                 <label>Menge</label>

@@ -114,7 +114,7 @@ export default async function RechnungDetail({ params }: { params: Promise<{ id:
               {inv.paid_at && <tr><td className="muted">Bezahlt am</td><td style={{ color: '#34c759' }}>{fmtDate(inv.paid_at)}</td></tr>}
             </tbody>
           </table>
-          {inv.note && <p className="muted" style={{ marginTop: 8 }}>{inv.note}</p>}
+          {inv.note && <p className="muted" style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{inv.note}</p>}
         </div>
       </div>
 
@@ -133,7 +133,7 @@ export default async function RechnungDetail({ params }: { params: Promise<{ id:
             {items.map((it, i) => (
               <tr key={i}>
                 <td className="muted">{i + 1}</td>
-                <td>{it.description}</td>
+                <td style={{ whiteSpace: 'pre-wrap' }}>{it.description}</td>
                 <td style={{ textAlign: 'right' }}>{it.quantity}</td>
                 <td className="muted">{UNITS[it.unit] || it.unit}</td>
                 <td style={{ textAlign: 'right' }}>{eur(it.unit_price)}</td>
