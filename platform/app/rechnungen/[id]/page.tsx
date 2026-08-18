@@ -2,12 +2,19 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { loadInvoice, getCompany, eur, fmtDate, computeTotals, STATUS_LABEL, UNITS, round2 } from '@/lib/invoices';
 import { xrechnungMissing } from '@/lib/xrechnung';
-import { setInvoiceStatus, deleteInvoice } from '../../actions';
+import { smtpConfigured } from '@/lib/invoice-mail';
+import { setInvoiceStatus, deleteInvoice, sendInvoiceEmail } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RechnungDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function RechnungDetail({
+  params, searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ mailed?: string; noxml?: string; mailerror?: string }>;
+}) {
   const { id } = await params;
+  const { mailed, noxml, mailerror } = await searchParams;
   const data = await loadInvoice(id);
   if (!data) notFound();
   const { invoice: inv, items } = data;
@@ -15,6 +22,8 @@ export default async function RechnungDetail({ params }: { params: Promise<{ id:
   const t = computeTotals(items);
   const gross = inv.small_business ? t.net : t.gross;
   const missing = xrechnungMissing(inv, company);
+  const smtpOk = smtpConfigured();
+  const canMail = (inv.status === 'draft' || inv.status === 'sent');
 
   const statusColor =
     inv.status === 'paid' ? '#34c759'
@@ -36,6 +45,20 @@ export default async function RechnungDetail({ params }: { params: Promise<{ id:
         <span style={{ color: statusColor, fontWeight: 600 }}>● {STATUS_LABEL[inv.status]}</span>
       </div>
 
+      {mailed && (
+        <div className="card" style={{ borderColor: '#2a4a33', background: '#162016' }}>
+          <span style={{ color: '#34c759' }}>
+            ✓ Rechnung per E-Mail an <strong>{mailed}</strong> versendet
+            {noxml ? ' — nur als PDF (für die XRechnung fehlten Pflichtangaben)' : ' (XRechnung + PDF)'}.
+          </span>
+        </div>
+      )}
+      {mailerror && (
+        <div className="card" style={{ borderColor: '#5a2a2a', background: '#241616' }}>
+          <span style={{ color: '#ff9a9a' }}>✗ E-Mail nicht versendet: {mailerror}</span>
+        </div>
+      )}
+
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <div className="row" style={{ gap: 8 }}>
@@ -48,6 +71,16 @@ export default async function RechnungDetail({ params }: { params: Promise<{ id:
                style={{ border: '1px solid #2a4a33', color: '#34c759', padding: '4px 9px', borderRadius: 8, textDecoration: 'none' }}>
               🧾 E-Rechnung (XML)
             </a>
+            {canMail && smtpOk && inv.c_email && (
+              <form action={sendInvoiceEmail}>
+                <input type="hidden" name="id" value={inv.id} />
+                <button className="btn-sm" type="submit"
+                        title={`sendet PDF + XRechnung an ${inv.c_email}${inv.status === 'draft' ? ' und markiert die Rechnung als versendet' : ''}`}
+                        style={{ border: '1px solid #2a4a33', color: '#34c759' }}>
+                  📧 {inv.status === 'sent' ? 'Erneut per E-Mail senden' : `Per E-Mail senden an ${inv.c_email}`}
+                </button>
+              </form>
+            )}
           </div>
           <div className="row" style={{ gap: 8 }}>
             {inv.status === 'draft' && (
@@ -78,6 +111,19 @@ export default async function RechnungDetail({ params }: { params: Promise<{ id:
           <p className="muted" style={{ margin: '10px 0 0', fontSize: 12 }}>
             Entwurf: noch änderbar. Nach „versendet" ist die Rechnung fixiert (Bearbeiten gesperrt) —
             so bleiben Nummernkreis und Inhalte revisionssicher.
+          </p>
+        )}
+        {canMail && !smtpOk && (
+          <p className="muted" style={{ margin: '10px 0 0', fontSize: 12 }}>
+            📧 Direktversand inaktiv — dafür in Vercel die Postfach-Zugangsdaten hinterlegen:
+            <code style={{ marginLeft: 6 }}>SMTP_HOST</code> <code>SMTP_PORT</code>{' '}
+            <code>SMTP_USER</code> <code>SMTP_PASS</code> (optional <code>SMTP_FROM</code>, <code>SMTP_BCC</code>).
+          </p>
+        )}
+        {canMail && smtpOk && !inv.c_email && (
+          <p className="muted" style={{ margin: '10px 0 0', fontSize: 12 }}>
+            📧 Direktversand: beim Empfänger ist keine E-Mail-Adresse hinterlegt
+            {inv.status === 'draft' && <> — über <Link href={`/rechnungen/${inv.id}/bearbeiten`}>Bearbeiten</Link> ergänzen</>}.
           </p>
         )}
         {missing.length > 0 && (

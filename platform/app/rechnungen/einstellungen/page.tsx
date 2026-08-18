@@ -118,7 +118,8 @@ export default async function RechnungsEinstellungen({ searchParams }: { searchP
               <input name="invoice_prefix" defaultValue={c.invoice_prefix} style={inp} />
             </div>
             <div className="muted" style={{ paddingTop: 26, fontSize: 12 }}>
-              Nummernformat: {c.invoice_prefix}-{new Date().getFullYear()}-0001 (fortlaufend je Jahr)
+              Nummernformat: {c.invoice_prefix}-{new Date().getFullYear()}-
+              {String(new Date().getMonth() + 1).padStart(2, '0')}-0001 (fortlaufend je Monat)
             </div>
           </div>
           <label>Fußtext auf der PDF (optional)</label>

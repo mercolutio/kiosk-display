@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache';
 import { sql, ensureSchema } from '@/lib/db';
 import { geocodeAddress } from '@/lib/geo';
 import { signToken, SESSION_COOKIE } from '@/lib/auth';
-import { computeTotals, nextInvoiceNumber, getCompany, type InvoiceItem } from '@/lib/invoices';
+import { computeTotals, nextInvoiceNumber, getCompany, loadInvoice, type InvoiceItem } from '@/lib/invoices';
+import { sendInvoiceMail } from '@/lib/invoice-mail';
 
 // ---- Auth ----
 export async function login(formData: FormData) {
@@ -403,6 +404,24 @@ export async function setInvoiceStatus(formData: FormData) {
   } catch { /* Tabelle evtl. noch nicht angelegt */ }
   revalidatePath('/rechnungen');
   revalidatePath(`/rechnungen/${id}`);
+}
+
+// Rechnung per E-Mail an den Empfaenger senden (PDF + XRechnung als Anhang).
+// Bei Erfolg wird ein Entwurf automatisch auf "versendet" gesetzt.
+export async function sendInvoiceEmail(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  if (!id) redirect('/rechnungen');
+  const data = await loadInvoice(id);
+  if (!data) redirect('/rechnungen');
+  const company = await getCompany();
+  const res = await sendInvoiceMail(data.invoice, data.items, company);
+  if (res.ok) {
+    try { await sql`update invoices set status = 'sent' where id = ${id} and status = 'draft'`; } catch {}
+    revalidatePath('/rechnungen');
+    revalidatePath(`/rechnungen/${id}`);
+    redirect(`/rechnungen/${id}?mailed=${encodeURIComponent(res.to || '1')}${res.withXml ? '' : '&noxml=1'}`);
+  }
+  redirect(`/rechnungen/${id}?mailerror=${encodeURIComponent(res.error || 'unbekannter Fehler')}`);
 }
 
 export async function deleteInvoice(formData: FormData) {
