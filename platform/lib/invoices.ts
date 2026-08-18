@@ -7,6 +7,8 @@ export type Company = {
   tax_number: string; vat_id: string;
   iban: string; bic: string; bank_name: string;
   small_business: boolean; payment_days: number; invoice_prefix: string; invoice_footer: string;
+  smtp_host: string; smtp_port: number; smtp_user: string; smtp_pass: string;
+  smtp_from: string; smtp_bcc: string;
 };
 
 export type InvoiceItem = {
@@ -94,6 +96,7 @@ const COMPANY_DEFAULTS: Company = {
   tax_number: '', vat_id: '',
   iban: '', bic: '', bank_name: '',
   small_business: false, payment_days: 14, invoice_prefix: 'RE', invoice_footer: '',
+  smtp_host: '', smtp_port: 0, smtp_user: '', smtp_pass: '', smtp_from: '', smtp_bcc: '',
 };
 
 export async function getCompany(): Promise<Company> {
@@ -112,6 +115,9 @@ export async function getCompany(): Promise<Company> {
       payment_days: Number(r.payment_days) || 14,
       invoice_prefix: r.invoice_prefix || 'RE',
       invoice_footer: r.invoice_footer || '',
+      smtp_host: r.smtp_host || '', smtp_port: Number(r.smtp_port) || 0,
+      smtp_user: r.smtp_user || '', smtp_pass: r.smtp_pass || '',
+      smtp_from: r.smtp_from || '', smtp_bcc: r.smtp_bcc || '',
     };
   } catch {
     return { ...COMPANY_DEFAULTS };

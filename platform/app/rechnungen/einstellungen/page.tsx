@@ -107,6 +107,54 @@ export default async function RechnungsEinstellungen({ searchParams }: { searchP
         </div>
 
         <div className="card">
+          <h2>E-Mail-Versand (SMTP)</h2>
+          <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
+            Zugangsdaten deines Postfachs — dieselben wie in einer Mail-App (das Sende-Gegenstück
+            zu IMAP). Damit verschickt das Tool Rechnungen direkt per Knopf
+            „📧 Per E-Mail senden" (PDF + XRechnung im Anhang).
+          </p>
+          <div className="grid2">
+            <div>
+              <label>SMTP-Server (Host)</label>
+              <input name="smtp_host" defaultValue={c.smtp_host} style={inp}
+                     placeholder="z. B. smtp.ionos.de / smtp.strato.de" />
+            </div>
+            <div>
+              <label>Port (587 = Standard, 465 = SSL)</label>
+              <input name="smtp_port" type="number" defaultValue={c.smtp_port || 587} style={inp} />
+            </div>
+          </div>
+          <div className="grid2">
+            <div>
+              <label>Benutzer (meist deine E-Mail-Adresse)</label>
+              <input name="smtp_user" defaultValue={c.smtp_user} style={inp} placeholder="rechnung@…" />
+            </div>
+            <div>
+              <label>Passwort {c.smtp_pass ? '(gespeichert — leer lassen zum Behalten)' : ''}</label>
+              <input name="smtp_pass" type="password" autoComplete="new-password" style={inp}
+                     placeholder={c.smtp_pass ? '••••••••' : 'Postfach-Passwort'} />
+            </div>
+          </div>
+          <div className="grid2">
+            <div>
+              <label>Absenderanzeige (optional)</label>
+              <input name="smtp_from" defaultValue={c.smtp_from} style={inp}
+                     placeholder={`z. B. microwerbung <rechnung@…>`} />
+            </div>
+            <div>
+              <label>Kopie an dich (BCC, optional)</label>
+              <input name="smtp_bcc" defaultValue={c.smtp_bcc} style={inp}
+                     placeholder="deine@adresse.de" />
+            </div>
+          </div>
+          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+            Tipp: BCC an dich selbst setzen — dann liegt jede versendete Rechnung als Kopie in
+            deinem Postfach (SMTP befüllt den „Gesendet"-Ordner nicht). Bei Gmail/Outlook ein
+            App-Passwort verwenden. Das Passwort wird in der Datenbank der Plattform gespeichert.
+          </p>
+        </div>
+
+        <div className="card">
           <h2>Rechnungsstellung</h2>
           <div className="row">
             <div style={{ width: 160 }}>

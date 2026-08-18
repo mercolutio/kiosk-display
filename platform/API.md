@@ -105,18 +105,14 @@ POST-Body:
 
 ### E-Mail-Versand (SMTP)
 
-Für `/invoices/{id}/send` und den Dashboard-Knopf „Per E-Mail senden" müssen
-die Postfach-Zugangsdaten als Env-Variablen in Vercel hinterlegt sein
-(das „Sende-Gegenstück" zu IMAP — gleiche Zugangsdaten, SMTP-Host des Anbieters):
+Für `/invoices/{id}/send` und den Dashboard-Knopf „Per E-Mail senden" werden
+die Postfach-Zugangsdaten im **Dashboard** hinterlegt: *Rechnungen →
+Einstellungen → „E-Mail-Versand (SMTP)"* (Host, Port, Benutzer, Passwort,
+optional Absenderanzeige und BCC). Das sind dieselben Zugangsdaten wie in einer
+Mail-App — SMTP ist das Sende-Gegenstück zu IMAP.
 
-| Variable | Bedeutung |
-|---|---|
-| `SMTP_HOST` | z. B. `smtp.ionos.de`, `smtp.strato.de`, `smtp.gmail.com` |
-| `SMTP_PORT` | `587` (STARTTLS, Standard) oder `465` (SSL) |
-| `SMTP_USER` | Postfach-Benutzer (meist die E-Mail-Adresse) |
-| `SMTP_PASS` | Postfach-Passwort (Gmail/Outlook: App-Passwort erforderlich) |
-| `SMTP_FROM` | optional, Absenderanzeige — Standard `<Firma> <SMTP_USER>` |
-| `SMTP_BCC` | optional, Blindkopie z. B. an dich selbst („Gesendet"-Ersatz) |
+Fallback: Sind im Dashboard keine Werte gesetzt, gelten die Env-Variablen
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_BCC`.
 
 ## Verträge / Dokumente
 

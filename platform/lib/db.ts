@@ -59,9 +59,21 @@ export function ensureSchema(): Promise<void> {
           payment_days   int not null default 14,
           invoice_prefix text not null default 'RE',
           invoice_footer text,
+          smtp_host      text,                              -- E-Mail-Versand (SMTP) direkt aus dem Tool
+          smtp_port      int,
+          smtp_user      text,
+          smtp_pass      text,
+          smtp_from      text,
+          smtp_bcc       text,
           updated_at     timestamptz not null default now()
         )`;
       } catch (e) { console.error('[db] ensureSchema company_settings:', (e as Error).message); }
+      for (const col of ['smtp_host text', 'smtp_port int', 'smtp_user text', 'smtp_pass text', 'smtp_from text', 'smtp_bcc text']) {
+        try {
+          // Spaltenname/-typ stammen aus der festen Liste oben (kein User-Input).
+          await sql.query(`alter table company_settings add column if not exists ${col}`);
+        } catch (e) { console.error('[db] ensureSchema company_settings smtp:', (e as Error).message); }
+      }
       try {
         await sql`create table if not exists invoices (
           id             uuid primary key default gen_random_uuid(),
