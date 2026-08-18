@@ -15,11 +15,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (denied) return denied;
   const { id } = await params;
   await ensureSchema();
-  if (!smtpConfigured()) return err('SMTP nicht konfiguriert (SMTP_HOST/USER/PASS)', 503);
   const data = await loadInvoice(id);
   if (!data) return err('Rechnung nicht gefunden', 404);
   if (data.invoice.status === 'cancelled') return err('Rechnung ist storniert', 409);
   const company = await getCompany();
+  if (!smtpConfigured(company)) {
+    return err('SMTP nicht konfiguriert — unter Rechnungen → Einstellungen → E-Mail-Versand hinterlegen', 503);
+  }
   const res = await sendInvoiceMail(data.invoice, data.items, company);
   if (!res.ok) return err(res.error || 'Versand fehlgeschlagen', 502);
   if (data.invoice.status === 'draft') {

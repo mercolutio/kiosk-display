@@ -240,15 +240,27 @@ export async function saveCompanySettings(formData: FormData) {
   const smallBusiness = formData.get('small_business') != null;
   const paymentDays = Math.max(0, parseInt(s('payment_days') || '14', 10) || 14);
   const prefix = (s('invoice_prefix') || 'RE').replace(/[^A-Za-z0-9]/g, '').toUpperCase() || 'RE';
+  const smtpPort = parseInt(s('smtp_port') || '587', 10) || 587;
+  // Leeres Passwortfeld = gespeichertes Passwort behalten (es wird im Formular
+  // nie wieder angezeigt, nur ueberschrieben).
+  let smtpPass = s('smtp_pass');
+  if (!smtpPass) {
+    try {
+      const r = await sql`select smtp_pass from company_settings where id = 1`;
+      smtpPass = r.rows[0]?.smtp_pass || '';
+    } catch {}
+  }
   try {
     await sql`
       insert into company_settings (id, name, owner, street, zip, city, country, email, phone, website,
                                     tax_number, vat_id, iban, bic, bank_name,
-                                    small_business, payment_days, invoice_prefix, invoice_footer, updated_at)
+                                    small_business, payment_days, invoice_prefix, invoice_footer,
+                                    smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from, smtp_bcc, updated_at)
       values (1, ${s('name')}, ${s('owner')}, ${s('street')}, ${s('zip')}, ${s('city')}, ${s('country') || 'DE'},
               ${s('email')}, ${s('phone')}, ${s('website')},
               ${s('tax_number')}, ${s('vat_id')}, ${s('iban')}, ${s('bic')}, ${s('bank_name')},
-              ${smallBusiness}, ${paymentDays}, ${prefix}, ${s('invoice_footer')}, now())
+              ${smallBusiness}, ${paymentDays}, ${prefix}, ${s('invoice_footer')},
+              ${s('smtp_host')}, ${smtpPort}, ${s('smtp_user')}, ${smtpPass}, ${s('smtp_from')}, ${s('smtp_bcc')}, now())
       on conflict (id) do update set
         name = excluded.name, owner = excluded.owner, street = excluded.street,
         zip = excluded.zip, city = excluded.city, country = excluded.country,
@@ -257,6 +269,9 @@ export async function saveCompanySettings(formData: FormData) {
         iban = excluded.iban, bic = excluded.bic, bank_name = excluded.bank_name,
         small_business = excluded.small_business, payment_days = excluded.payment_days,
         invoice_prefix = excluded.invoice_prefix, invoice_footer = excluded.invoice_footer,
+        smtp_host = excluded.smtp_host, smtp_port = excluded.smtp_port,
+        smtp_user = excluded.smtp_user, smtp_pass = excluded.smtp_pass,
+        smtp_from = excluded.smtp_from, smtp_bcc = excluded.smtp_bcc,
         updated_at = now()
     `;
   } catch { /* Tabelle evtl. noch nicht angelegt */ }

@@ -113,6 +113,12 @@ create table if not exists company_settings (
   payment_days   int not null default 14,
   invoice_prefix text not null default 'RE',
   invoice_footer text,
+  smtp_host      text,                              -- E-Mail-Versand (SMTP) direkt aus dem Tool
+  smtp_port      int,
+  smtp_user      text,
+  smtp_pass      text,
+  smtp_from      text,
+  smtp_bcc       text,
   updated_at     timestamptz not null default now()
 );
 

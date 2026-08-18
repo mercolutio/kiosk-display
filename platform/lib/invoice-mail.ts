@@ -1,21 +1,28 @@
 // Rechnungsversand per E-Mail ueber das eigene Postfach (SMTP).
-// Konfiguration via Env (Vercel):
-//   SMTP_HOST  z. B. smtp.ionos.de / smtp.strato.de / smtp.gmail.com
-//   SMTP_PORT  587 (STARTTLS, Standard) oder 465 (SSL)
-//   SMTP_USER  Postfach-Benutzer (meist die E-Mail-Adresse)
-//   SMTP_PASS  Postfach-Passwort (bei Gmail/Outlook: App-Passwort)
-//   SMTP_FROM  optional, Absenderanzeige — Standard: "<Firma> <SMTP_USER>"
-//   SMTP_BCC   optional, Kopie-Empfaenger (kommagetrennt) — so landet der
-//              Versand auch bei dir (Ersatz fuer den "Gesendet"-Ordner,
-//              den reines SMTP nicht befuellt)
+// Zugangsdaten kommen aus den Rechnungs-Einstellungen im Dashboard
+// (company_settings.smtp_*); Env-Variablen (SMTP_HOST/PORT/USER/PASS/FROM/BCC)
+// dienen nur noch als Fallback.
 import nodemailer from 'nodemailer';
 import type { Company, Invoice, InvoiceItem } from '@/lib/invoices';
 import { eur, fmtDate } from '@/lib/invoices';
 import { buildInvoicePdf } from '@/lib/invoice-pdf';
 import { buildXRechnung, xrechnungMissing } from '@/lib/xrechnung';
 
-export function smtpConfigured(): boolean {
-  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+// Aufgeloeste SMTP-Konfiguration: Einstellungen aus dem Tool zuerst, Env als Fallback.
+export function smtpSettings(company: Company) {
+  return {
+    host: company.smtp_host || process.env.SMTP_HOST || '',
+    port: company.smtp_port || parseInt(process.env.SMTP_PORT || '587', 10) || 587,
+    user: company.smtp_user || process.env.SMTP_USER || '',
+    pass: company.smtp_pass || process.env.SMTP_PASS || '',
+    from: company.smtp_from || process.env.SMTP_FROM || '',
+    bcc: company.smtp_bcc || process.env.SMTP_BCC || '',
+  };
+}
+
+export function smtpConfigured(company: Company): boolean {
+  const s = smtpSettings(company);
+  return !!(s.host && s.user && s.pass);
 }
 
 const escHtml = (s: string) =>
@@ -24,17 +31,17 @@ const escHtml = (s: string) =>
 export async function sendInvoiceMail(
   inv: Invoice, items: InvoiceItem[], company: Company,
 ): Promise<{ ok: boolean; error?: string; withXml?: boolean; to?: string }> {
-  if (!smtpConfigured()) {
-    return { ok: false, error: 'SMTP nicht konfiguriert — SMTP_HOST, SMTP_USER und SMTP_PASS in Vercel setzen' };
+  if (!smtpConfigured(company)) {
+    return { ok: false, error: 'SMTP nicht konfiguriert — Postfach-Zugangsdaten unter Rechnungen → Einstellungen → „E-Mail-Versand" hinterlegen' };
   }
   if (!inv.c_email) return { ok: false, error: 'Beim Empfänger ist keine E-Mail-Adresse hinterlegt' };
 
-  const port = parseInt(process.env.SMTP_PORT || '587', 10) || 587;
+  const smtp = smtpSettings(company);
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port,
-    secure: port === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.port === 465,
+    auth: { user: smtp.user, pass: smtp.pass },
   });
 
   // Anhaenge: PDF immer; XRechnung nur, wenn alle Pflichtangaben da sind
@@ -66,8 +73,8 @@ export async function sendInvoiceMail(
     <p style="color:#888;font-size:12px">${escHtml(addressLine)}${company.phone ? ` · Tel. ${escHtml(company.phone)}` : ''}${company.email ? ` · ${escHtml(company.email)}` : ''}</p>
   `;
 
-  const from = process.env.SMTP_FROM || `${firma} <${process.env.SMTP_USER}>`;
-  const bcc = (process.env.SMTP_BCC || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const from = smtp.from || `${firma} <${smtp.user}>`;
+  const bcc = smtp.bcc.split(',').map((s) => s.trim()).filter(Boolean);
 
   try {
     await transporter.sendMail({

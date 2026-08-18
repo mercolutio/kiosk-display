@@ -22,7 +22,7 @@ export default async function RechnungDetail({
   const t = computeTotals(items);
   const gross = inv.small_business ? t.net : t.gross;
   const missing = xrechnungMissing(inv, company);
-  const smtpOk = smtpConfigured();
+  const smtpOk = smtpConfigured(company);
   const canMail = (inv.status === 'draft' || inv.status === 'sent');
 
   const statusColor =
@@ -115,9 +115,9 @@ export default async function RechnungDetail({
         )}
         {canMail && !smtpOk && (
           <p className="muted" style={{ margin: '10px 0 0', fontSize: 12 }}>
-            📧 Direktversand inaktiv — dafür in Vercel die Postfach-Zugangsdaten hinterlegen:
-            <code style={{ marginLeft: 6 }}>SMTP_HOST</code> <code>SMTP_PORT</code>{' '}
-            <code>SMTP_USER</code> <code>SMTP_PASS</code> (optional <code>SMTP_FROM</code>, <code>SMTP_BCC</code>).
+            📧 Direktversand inaktiv — Postfach-Zugangsdaten unter{' '}
+            <Link href="/rechnungen/einstellungen">Einstellungen</Link> im Abschnitt
+            „E-Mail-Versand (SMTP)" hinterlegen.
           </p>
         )}
         {canMail && smtpOk && !inv.c_email && (
