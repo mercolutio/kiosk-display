@@ -79,6 +79,7 @@ Der Agent auf dem Pi holt Befehle beim nächsten Sync ab (≤ ~30 s).
 | DELETE | `/invoices/{id}` | nur Entwurf/Storno |
 | GET | `/invoices/{id}/file?format=pdf` | Rechnungs-PDF (binär) |
 | GET | `/invoices/{id}/file?format=xrechnung` | E-Rechnung als XRechnung-XML (EN 16931/UBL) |
+| POST | `/invoices/{id}/send` | Rechnung per E-Mail an den Empfänger senden (PDF + XRechnung als Anhang; Entwurf wird dabei „versendet") — benötigt SMTP-Konfiguration, s. u. |
 
 POST-Body:
 
@@ -96,10 +97,26 @@ POST-Body:
 ```
 
 - Einheiten: `C62` Stück · `MON` Monat · `HUR` Stunde · `DAY` Tag.
-- Nummernkreis, Zahlungsziel und Kleinunternehmer-Regel (§ 19 UStG) wendet der
-  Server aus den Dashboard-Einstellungen an.
+- Nummernkreis (`RE-JJJJ-MM-NNNN`, fortlaufend je Monat), Zahlungsziel und
+  Kleinunternehmer-Regel (§ 19 UStG) wendet der Server aus den
+  Dashboard-Einstellungen an.
 - Neue Rechnungen sind immer **Entwürfe** — versenden/bezahlt-setzen ist ein
-  bewusster zweiter Schritt (PATCH oder Dashboard).
+  bewusster zweiter Schritt (PATCH, `/send` oder Dashboard).
+
+### E-Mail-Versand (SMTP)
+
+Für `/invoices/{id}/send` und den Dashboard-Knopf „Per E-Mail senden" müssen
+die Postfach-Zugangsdaten als Env-Variablen in Vercel hinterlegt sein
+(das „Sende-Gegenstück" zu IMAP — gleiche Zugangsdaten, SMTP-Host des Anbieters):
+
+| Variable | Bedeutung |
+|---|---|
+| `SMTP_HOST` | z. B. `smtp.ionos.de`, `smtp.strato.de`, `smtp.gmail.com` |
+| `SMTP_PORT` | `587` (STARTTLS, Standard) oder `465` (SSL) |
+| `SMTP_USER` | Postfach-Benutzer (meist die E-Mail-Adresse) |
+| `SMTP_PASS` | Postfach-Passwort (Gmail/Outlook: App-Passwort erforderlich) |
+| `SMTP_FROM` | optional, Absenderanzeige — Standard `<Firma> <SMTP_USER>` |
+| `SMTP_BCC` | optional, Blindkopie z. B. an dich selbst („Gesendet"-Ersatz) |
 
 ## Verträge / Dokumente
 

@@ -118,10 +118,14 @@ export async function getCompany(): Promise<Company> {
   }
 }
 
-// Naechste fortlaufende Rechnungsnummer: <Prefix>-<Jahr>-<lfd. Nr, 4-stellig>.
+// Naechste fortlaufende Rechnungsnummer: <Prefix>-JJJJ-MM-<lfd. Nr, 4-stellig>,
+// fortlaufend je Monat (z. B. RE-2026-08-0001). Aeltere Nummern im alten
+// Format (RE-JJJJ-NNNN) bleiben unveraendert gueltig und werden ignoriert.
 export async function nextInvoiceNumber(prefix: string): Promise<string> {
-  const year = new Date().getFullYear();
-  const like = `${prefix}-${year}-%`;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const like = `${prefix}-${year}-${month}-%`;
   let max = 0;
   try {
     const { rows } = await sql`select number from invoices where number like ${like}`;
@@ -130,7 +134,7 @@ export async function nextInvoiceNumber(prefix: string): Promise<string> {
       if (n > max) max = n;
     }
   } catch { /* Tabelle evtl. noch nicht angelegt */ }
-  return `${prefix}-${year}-${String(max + 1).padStart(4, '0')}`;
+  return `${prefix}-${year}-${month}-${String(max + 1).padStart(4, '0')}`;
 }
 
 export function normalizeInvoiceRow(r: any): Invoice {

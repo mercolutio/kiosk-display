@@ -225,14 +225,22 @@ export async function buildInvoicePdf(inv: Invoice, items: InvoiceItem[], compan
     text(page, 'Vielen Dank für Ihren Auftrag!', M, y, 9.5, font, GREEN);
   }
 
-  // ---- Fusszeile auf jeder Seite ----
-  const taxLine = company.vat_id
-    ? `USt-IdNr. ${company.vat_id}`
-    : company.tax_number ? `Steuernr. ${company.tax_number}` : '';
+  // ---- Fusszeile auf jeder Seite (3 Bloecke wie ein klassischer
+  // Geschaeftsbrief): Firma/Adresse/Kontakt · Steuern · Inhaber/Bank ----
   const cols: string[][] = [
-    [company.name, company.owner, company.street, [company.zip, company.city].filter(Boolean).join(' ')].filter(Boolean),
-    [company.phone && `Tel. ${company.phone}`, company.email, company.website].filter(Boolean) as string[],
-    [company.bank_name, company.iban && `IBAN ${company.iban}`, taxLine].filter(Boolean) as string[],
+    [
+      company.name, company.street, [company.zip, company.city].filter(Boolean).join(' '),
+      company.phone && `Tel.: ${company.phone}`, company.email, company.website,
+    ].filter(Boolean) as string[],
+    [
+      company.vat_id && `USt-IdNr.: ${company.vat_id}`,
+      company.tax_number && `Steuernummer: ${company.tax_number}`,
+    ].filter(Boolean) as string[],
+    [
+      company.owner, company.bank_name,
+      company.iban && `IBAN: ${company.iban}`,
+      company.bic && `BIC: ${company.bic}`,
+    ].filter(Boolean) as string[],
   ];
   const pages = doc.getPages();
   pages.forEach((p, pi) => {
