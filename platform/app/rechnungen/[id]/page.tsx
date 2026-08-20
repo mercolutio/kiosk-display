@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { loadInvoice, getCompany, eur, fmtDate, computeTotals, STATUS_LABEL, UNITS, round2 } from '@/lib/invoices';
 import { xrechnungMissing } from '@/lib/xrechnung';
 import { smtpConfigured } from '@/lib/invoice-mail';
-import { setInvoiceStatus, deleteInvoice, sendInvoiceEmail } from '../../actions';
+import { setInvoiceStatus, deleteInvoice, sendInvoiceEmail, renumberInvoice } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,6 +90,15 @@ export default async function RechnungDetail({
                       style={{ border: '1px solid #333', background: '#1d1d20', color: '#eee', padding: '4px 9px', borderRadius: 8, textDecoration: 'none' }}>
                   ✏️ Bearbeiten
                 </Link>
+                {!/^[A-Z0-9]+-\d{4}-\d{2}-\d{4}$/.test(inv.number) && (
+                  <form action={renumberInvoice}>
+                    <input type="hidden" name="id" value={inv.id} />
+                    <button className="btn-sm" type="submit"
+                            title="Diese Nummer stammt noch aus dem alten Format — vergibt die nächste Nummer im Format RE-JJJJ-MM-Nr (nur bei Entwürfen möglich)">
+                      № aktualisieren
+                    </button>
+                  </form>
+                )}
               </>
             )}
             {inv.status === 'sent' && (
