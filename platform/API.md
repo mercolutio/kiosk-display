@@ -114,6 +114,19 @@ Mail-App — SMTP ist das Sende-Gegenstück zu IMAP.
 Fallback: Sind im Dashboard keine Werte gesetzt, gelten die Env-Variablen
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_BCC`.
 
+## Einstellungen (Firmendaten des Rechnungsabsenders)
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| GET | `/settings` | aktuelle Einstellungen (SMTP-Passwort maskiert als `smtp_pass_set`) |
+| PUT | `/settings` | Teil-Update — nur mitgeschickte Felder werden geändert |
+
+Felder: `name, owner, street, zip, city, country, email, phone, website,
+tax_number, vat_id, iban, bic, bank_name, small_business, payment_days,
+invoice_prefix, invoice_footer, smtp_host, smtp_port, smtp_user, smtp_pass,
+smtp_from, smtp_bcc`. Diese Daten erscheinen als Absenderblock auf jeder
+Rechnungs-PDF und in der XRechnung.
+
 ## Verträge / Dokumente
 
 | Methode | Pfad | Zweck |
