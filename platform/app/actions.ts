@@ -7,7 +7,7 @@ import { sql, ensureSchema } from '@/lib/db';
 import { geocodeAddress } from '@/lib/geo';
 import { signToken, SESSION_COOKIE } from '@/lib/auth';
 import { computeTotals, nextInvoiceNumber, getCompany, loadInvoice, type InvoiceItem } from '@/lib/invoices';
-import { sendInvoiceMail } from '@/lib/invoice-mail';
+import { sendInvoiceMail, sendTestMail } from '@/lib/invoice-mail';
 
 // ---- Auth ----
 export async function login(formData: FormData) {
@@ -234,7 +234,8 @@ export async function setContractCategory(formData: FormData) {
 }
 
 // ---- Rechnungen ----
-export async function saveCompanySettings(formData: FormData) {
+// Gemeinsamer Speicher-Teil fuer "Speichern" und "Speichern & Testmail".
+async function persistCompanySettings(formData: FormData) {
   await ensureSchema();
   const s = (k: string) => String(formData.get(k) || '').trim();
   const smallBusiness = formData.get('small_business') != null;
@@ -276,7 +277,23 @@ export async function saveCompanySettings(formData: FormData) {
     `;
   } catch { /* Tabelle evtl. noch nicht angelegt */ }
   revalidatePath('/rechnungen');
+}
+
+export async function saveCompanySettings(formData: FormData) {
+  await persistCompanySettings(formData);
   redirect('/rechnungen/einstellungen?saved=1');
+}
+
+// Speichert die Einstellungen und schickt direkt eine Testmail — so lassen
+// sich frisch eingetragene SMTP-Zugangsdaten in einem Schritt pruefen.
+export async function saveAndTestSmtp(formData: FormData) {
+  await persistCompanySettings(formData);
+  const company = await getCompany();
+  const target = String(formData.get('smtp_test_to') || '').trim()
+    || company.smtp_bcc || company.email || company.smtp_user;
+  const res = await sendTestMail(company, target);
+  if (res.ok) redirect(`/rechnungen/einstellungen?mailtest=${encodeURIComponent(target)}`);
+  redirect(`/rechnungen/einstellungen?mailtesterror=${encodeURIComponent(res.error || 'unbekannter Fehler')}`);
 }
 
 // Positionen aus dem (per hidden field uebergebenen) JSON lesen und absichern.

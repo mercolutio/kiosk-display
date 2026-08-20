@@ -1,11 +1,15 @@
 import Link from 'next/link';
 import { getCompany } from '@/lib/invoices';
-import { saveCompanySettings } from '../../actions';
+import { saveCompanySettings, saveAndTestSmtp } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RechnungsEinstellungen({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
-  const { saved } = await searchParams;
+export default async function RechnungsEinstellungen({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string; mailtest?: string; mailtesterror?: string }>;
+}) {
+  const { saved, mailtest, mailtesterror } = await searchParams;
   const c = await getCompany();
   const inp = { width: '100%' } as const;
 
@@ -18,6 +22,21 @@ export default async function RechnungsEinstellungen({ searchParams }: { searchP
       {saved && (
         <div className="card" style={{ borderColor: '#2a4a33', background: '#162016' }}>
           <span style={{ color: '#34c759' }}>✓ Gespeichert.</span>
+        </div>
+      )}
+      {mailtest && (
+        <div className="card" style={{ borderColor: '#2a4a33', background: '#162016' }}>
+          <span style={{ color: '#34c759' }}>
+            ✓ Gespeichert und Testmail an <strong>{mailtest}</strong> verschickt — bitte Posteingang
+            (auch Spam-Ordner) prüfen.
+          </span>
+        </div>
+      )}
+      {mailtesterror && (
+        <div className="card" style={{ borderColor: '#5a2a2a', background: '#241616' }}>
+          <span style={{ color: '#ff9a9a' }}>
+            ✗ Gespeichert, aber Testmail fehlgeschlagen: {mailtesterror}
+          </span>
         </div>
       )}
 
@@ -152,6 +171,16 @@ export default async function RechnungsEinstellungen({ searchParams }: { searchP
             deinem Postfach (SMTP befüllt den „Gesendet"-Ordner nicht). Bei Gmail/Outlook ein
             App-Passwort verwenden. Das Passwort wird in der Datenbank der Plattform gespeichert.
           </p>
+          <div className="row" style={{ marginTop: 12, alignItems: 'flex-end' }}>
+            <div style={{ flex: 1, minWidth: 200, maxWidth: 320 }}>
+              <label>Testmail an (leer = BCC bzw. Firmen-E-Mail)</label>
+              <input name="smtp_test_to" placeholder="deine@adresse.de" style={{ width: '100%' }} />
+            </div>
+            <button className="btn-sm" formAction={saveAndTestSmtp} type="submit"
+                    style={{ border: '1px solid #2a4a33', color: '#34c759' }}>
+              💾 Speichern &amp; Testmail senden
+            </button>
+          </div>
         </div>
 
         <div className="card">

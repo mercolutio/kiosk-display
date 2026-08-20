@@ -28,6 +28,33 @@ export function smtpConfigured(company: Company): boolean {
 const escHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+// Einfache Testnachricht (Knopf in den Einstellungen), um die
+// SMTP-Zugangsdaten ohne echte Rechnung zu pruefen.
+export async function sendTestMail(company: Company, to: string): Promise<{ ok: boolean; error?: string }> {
+  if (!smtpConfigured(company)) {
+    return { ok: false, error: 'SMTP nicht konfiguriert — bitte Host, Benutzer und Passwort ausfüllen' };
+  }
+  if (!to) return { ok: false, error: 'Keine Ziel-Adresse — Testfeld, BCC oder Firmen-E-Mail ausfüllen' };
+  const smtp = smtpSettings(company);
+  const transporter = nodemailer.createTransport({
+    host: smtp.host, port: smtp.port, secure: smtp.port === 465,
+    auth: { user: smtp.user, pass: smtp.pass },
+  });
+  const firma = company.name || 'microwerbung';
+  try {
+    await transporter.sendMail({
+      from: smtp.from || `${firma} <${smtp.user}>`,
+      to,
+      subject: `Testnachricht — Rechnungsversand ${firma}`,
+      html: `<p>Diese Testnachricht bestätigt: Der E-Mail-Versand des Rechnungsmoduls funktioniert.</p>
+        <p style="color:#888;font-size:12px">Server ${escHtml(smtp.host)}:${smtp.port} · Absender ${escHtml(smtp.user)}</p>`,
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 export async function sendInvoiceMail(
   inv: Invoice, items: InvoiceItem[], company: Company,
 ): Promise<{ ok: boolean; error?: string; withXml?: boolean; to?: string }> {
