@@ -438,6 +438,24 @@ export async function setInvoiceStatus(formData: FormData) {
   revalidatePath(`/rechnungen/${id}`);
 }
 
+// Entwurf auf die naechste Nummer im aktuellen Format umstellen (z. B. von
+// altem RE-2026-0001 auf RE-2026-08-0001). Nur fuer Entwuerfe — versendete
+// Rechnungen behalten ihre Nummer (GoBD).
+export async function renumberInvoice(formData: FormData) {
+  const id = String(formData.get('id') || '');
+  if (!id) redirect('/rechnungen');
+  await ensureSchema();
+  const { rows } = await sql`select status from invoices where id = ${id} limit 1`;
+  if (rows[0]?.status === 'draft') {
+    const company = await getCompany();
+    const number = await nextInvoiceNumber(company.invoice_prefix);
+    try { await sql`update invoices set number = ${number} where id = ${id} and status = 'draft'`; } catch {}
+    revalidatePath('/rechnungen');
+    revalidatePath(`/rechnungen/${id}`);
+  }
+  redirect(`/rechnungen/${id}`);
+}
+
 // Rechnung per E-Mail an den Empfaenger senden (PDF + XRechnung als Anhang).
 // Bei Erfolg wird ein Entwurf automatisch auf "versendet" gesetzt.
 export async function sendInvoiceEmail(formData: FormData) {
