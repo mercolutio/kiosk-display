@@ -11,10 +11,10 @@ export default async function RechnungDetail({
   params, searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ mailed?: string; noxml?: string; mailerror?: string }>;
+  searchParams: Promise<{ mailed?: string; noxml?: string; mailerror?: string; renum?: string }>;
 }) {
   const { id } = await params;
-  const { mailed, noxml, mailerror } = await searchParams;
+  const { mailed, noxml, mailerror, renum } = await searchParams;
   const data = await loadInvoice(id);
   if (!data) notFound();
   const { invoice: inv, items } = data;
@@ -56,6 +56,14 @@ export default async function RechnungDetail({
       {mailerror && (
         <div className="card" style={{ borderColor: '#5a2a2a', background: '#241616' }}>
           <span style={{ color: '#ff9a9a' }}>✗ E-Mail nicht versendet: {mailerror}</span>
+        </div>
+      )}
+      {renum && (
+        <div className="card" style={{ borderColor: '#2a4a33', background: '#162016' }}>
+          <span style={{ color: '#34c759' }}>
+            ✓ Rechnungsnummer auf <strong>{inv.number}</strong> gesetzt
+            {renum.startsWith('swap:') && <> — getauscht mit <strong>{renum.slice(5)}</strong> (dieser Nummer gehört jetzt der andere Entwurf).</>}
+          </span>
         </div>
       )}
 

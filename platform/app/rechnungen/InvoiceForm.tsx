@@ -57,6 +57,7 @@ export default function InvoiceForm(props: {
   defaults: { issue: string; due: string; serviceStart: string; serviceEnd: string };
   initial?: {
     id: string;
+    number: string;
     buyer: Buyer;
     issue: string; due: string; serviceStart: string; serviceEnd: string;
     note: string;
@@ -150,7 +151,9 @@ export default function InvoiceForm(props: {
       {props.error && (
         <div className="card" style={{ borderColor: '#5a2a2a', background: '#241616' }}>
           <span style={{ color: '#ff9a9a' }}>
-            Bitte mindestens den Empfänger-Namen und eine Position mit Beschreibung angeben.
+            {props.error === 'numtaken'
+              ? 'Diese Rechnungsnummer gehört bereits zu einer versendeten Rechnung und kann nicht übernommen werden. Bitte eine andere Nummer wählen.'
+              : 'Bitte mindestens den Empfänger-Namen und eine Position mit Beschreibung angeben.'}
           </span>
         </div>
       )}
@@ -212,6 +215,16 @@ export default function InvoiceForm(props: {
 
       <div className="card">
         <h2>Eckdaten</h2>
+        {props.initial && (
+          <div style={{ maxWidth: 260, marginBottom: 4 }}>
+            <label>Rechnungsnummer</label>
+            <input name="number" defaultValue={props.initial.number} style={{ width: '100%', ...inp }} />
+            <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>
+              Nur bei Entwürfen änderbar. Gibst du die Nummer eines anderen Entwurfs ein,
+              werden die beiden getauscht.
+            </div>
+          </div>
+        )}
         <div className="row">
           <div>
             <label>Rechnungsdatum</label>
