@@ -380,10 +380,11 @@ export async function updateInvoice(formData: FormData) {
   await ensureSchema();
   const id = String(formData.get('id') || '');
   if (!id) redirect('/rechnungen');
-  const { rows } = await sql`select status, small_business from invoices where id = ${id} limit 1`;
+  const { rows } = await sql`select number, status, small_business from invoices where id = ${id} limit 1`;
   if (!rows[0]) redirect('/rechnungen');
   if (rows[0].status !== 'draft') redirect(`/rechnungen/${id}`); // nur Entwuerfe aenderbar
   const smallBusiness = !!rows[0].small_business;
+  const curNumber: string = rows[0].number;
   const f = invoiceFieldsFrom(formData);
   const items = parseInvoiceItems(formData, smallBusiness);
   if (!f.c_name || items.length === 0) redirect(`/rechnungen/${id}/bearbeiten?error=leer`);
@@ -407,9 +408,32 @@ export async function updateInvoice(formData: FormData) {
       values (${id}, ${it.position}, ${it.description}, ${it.quantity}, ${it.unit}, ${it.unit_price}, ${it.vat_rate})
     `;
   }
+
+  // Rechnungsnummer (nur Entwuerfe): frei setzbar, muss eindeutig sein.
+  // Gehoert die Wunschnummer bereits einem ANDEREN Entwurf, werden die beiden
+  // Nummern getauscht (haeufigster Fall: zwei Entwuerfe in falscher Reihenfolge).
+  // Zu einer versendeten Rechnung wird nicht getauscht.
+  const desired = String(formData.get('number') || '').trim().toUpperCase().replace(/[^A-Z0-9/\-]/g, '');
+  let renum = '';
+  if (desired && desired !== curNumber) {
+    const other = (await sql`select id, status from invoices where number = ${desired} limit 1`).rows[0];
+    if (other && other.status !== 'draft') {
+      redirect(`/rechnungen/${id}/bearbeiten?error=numtaken`);
+    }
+    if (other && other.id !== id) {
+      const tmp = `${desired}~swap`;
+      await sql`update invoices set number = ${tmp} where id = ${other.id}`;
+      await sql`update invoices set number = ${desired} where id = ${id}`;
+      await sql`update invoices set number = ${curNumber} where id = ${other.id}`;
+      renum = `swap:${curNumber}`;
+    } else {
+      await sql`update invoices set number = ${desired} where id = ${id}`;
+      renum = 'set';
+    }
+  }
   revalidatePath('/rechnungen');
   revalidatePath(`/rechnungen/${id}`);
-  redirect(`/rechnungen/${id}`);
+  redirect(`/rechnungen/${id}${renum ? `?renum=${encodeURIComponent(renum)}` : ''}`);
 }
 
 // Statuswechsel mit erlaubten Uebergaengen (Entwurf -> Offen -> Bezahlt/Storno).

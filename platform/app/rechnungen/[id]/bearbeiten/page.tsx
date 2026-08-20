@@ -45,6 +45,7 @@ export default async function RechnungBearbeiten({
         defaults={{ issue: inv.issue_date, due: inv.due_date || '', serviceStart: inv.service_start || '', serviceEnd: inv.service_end || '' }}
         initial={{
           id: inv.id,
+          number: inv.number,
           buyer: {
             name: inv.c_name, contact: inv.c_contact || '', street: inv.c_street || '',
             zip: inv.c_zip || '', city: inv.c_city || '', country: inv.c_country || 'DE',
