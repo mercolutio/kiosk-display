@@ -51,7 +51,7 @@ export async function sendTestMail(company: Company, to: string): Promise<{ ok: 
     });
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: (e as Error).message };
+    return { ok: false, error: `${(e as Error).message} — Server ${smtp.host}:${smtp.port}, Benutzer „${smtp.user}"` };
   }
 }
 
@@ -114,6 +114,9 @@ export async function sendInvoiceMail(
     });
     return { ok: true, withXml, to: inv.c_email };
   } catch (e) {
-    return { ok: false, error: 'Versand fehlgeschlagen: ' + (e as Error).message };
+    return {
+      ok: false,
+      error: `Versand fehlgeschlagen: ${(e as Error).message} — Server ${smtp.host}:${smtp.port}, Benutzer „${smtp.user}"`,
+    };
   }
 }
