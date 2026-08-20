@@ -34,6 +34,8 @@ export async function GET(request: Request) {
       'DELETE /api/v1/invoices/{id}': 'Entwurf/Storno löschen',
       'GET    /api/v1/invoices/{id}/file?format=pdf|xrechnung': 'Rechnungs-PDF bzw. E-Rechnung (XML)',
       'GET    /api/v1/contracts?category=': 'Verträge/Dokumente auflisten',
+      'GET    /api/v1/settings': 'Firmendaten/Rechnungs-Einstellungen lesen',
+      'PUT    /api/v1/settings': 'Einstellungen ändern (Teil-Update, nur mitgeschickte Felder)',
     },
     docs: 'siehe platform/API.md im Repository',
   });
